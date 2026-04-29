@@ -1,0 +1,53 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1.0, viewport-fit=cover"
+    />
+    <title>My Ride — E-hailing</title>
+    <link rel="stylesheet" href="/css/style.css" />
+  </head>
+  <body>
+    <div id="app">
+      <div class="topbar">
+        <div class="brand">
+          <div class="logo">MC</div>
+          <div>
+            <div class="brand-title">My Ride</div>
+            <div class="brand-subtitle">E-hailing ecosystem (web)</div>
+          </div>
+        </div>
+
+        <div class="topbar-actions">
+          <a class="btn ghost" href="#/">Home</a>
+          <a class="btn ghost" href="#/customer">Customer</a>
+          <a class="btn ghost" href="#/driver">Driver</a>
+          <a class="btn ghost" href="#/admin">Admin</a>
+          <button class="btn" id="btnLogout" style="display: none">Logout</button>
+        </div>
+      </div>
+
+      <div class="container">
+        <div id="toast" class="toast" style="display:none;"></div>
+
+        <div id="view"></div>
+
+        <div class="footer">
+          <div class="muted">
+            © <span id="year"></span> My Ride. Built for test mode (Stripe).
+          </div>
+          <div class="muted">
+            API: <code id="apiBase"></code>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <script src="/socket.io/socket.io.js"></script>
+    <script src="/vendor/jsQR.js"></script>
+    <script type="module" src="/js/main.js"></script>
+  </body>
+</html>
+
