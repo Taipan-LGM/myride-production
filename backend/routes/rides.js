@@ -27,10 +27,8 @@ function estimateFareCents(distanceMeters, vehicleType) {
   const perKm = 180;
 
   const mult = {
-    Bike: 0.75,
-    Auto: 0.9,
-    Mini: 1.0,
-    Sedan: 1.25,
+    Car: 1.0,
+    MPV: 1.25,
   }[vehicleType];
 
   const km = Math.max(0.5, distanceMeters / 1000);
@@ -68,14 +66,29 @@ function pickNearestDriver({ pickup_lat, pickup_lng, vehicle_type }) {
   return best;
 }
 
+function splitFareCents(totalCents) {
+  const row = db
+    .prepare("SELECT owner_commission_pct FROM platform_settings WHERE id=1")
+    .get();
+  const ownerPct = Number(row?.owner_commission_pct ?? 51);
+  const t = Math.max(0, Math.round(Number(totalCents) || 0));
+  const owner = Math.min(t, Math.round((t * ownerPct) / 100));
+  return { owner_commission_cents: owner, driver_earnings_cents: t - owner };
+}
+
 const createRideSchema = z.object({
   pickup_text: z.string().trim().min(3).max(120),
   pickup_lat: z.number().finite(),
   pickup_lng: z.number().finite(),
+  pickup_street_number: z.string().trim().max(20).optional(),
+  pickup_route: z.string().trim().max(120).optional(),
   dropoff_text: z.string().trim().min(3).max(120),
   dropoff_lat: z.number().finite(),
   dropoff_lng: z.number().finite(),
-  vehicle_type: z.enum(["Auto", "Mini", "Sedan", "Bike"]),
+  dropoff_street_number: z.string().trim().max(20).optional(),
+  dropoff_route: z.string().trim().max(120).optional(),
+  vehicle_type: z.enum(["Car", "MPV"]),
+  payment_method: z.enum(["cash", "card"]).optional(),
 });
 
 router.post("/", authRequired, roleRequired("customer"), (req, res) => {
@@ -87,6 +100,9 @@ router.post("/", authRequired, roleRequired("customer"), (req, res) => {
   }
 
   const data = parsed.data;
+  const paymentMethod = data.payment_method || "cash";
+  const initialPaymentStatus =
+    paymentMethod === "card" ? "requires_payment" : "unpaid";
   const distance = haversineMeters(
     data.pickup_lat,
     data.pickup_lng,
@@ -94,6 +110,7 @@ router.post("/", authRequired, roleRequired("customer"), (req, res) => {
     data.dropoff_lng
   );
   const fare_estimate_cents = estimateFareCents(distance, data.vehicle_type);
+  const split = splitFareCents(fare_estimate_cents);
 
   const match = pickNearestDriver(data);
   const io = req.app.locals.io;
@@ -112,9 +129,12 @@ router.post("/", authRequired, roleRequired("customer"), (req, res) => {
             customer_id, driver_id, vehicle_type,
             pickup_text, pickup_lat, pickup_lng,
             dropoff_text, dropoff_lat, dropoff_lng,
+            pickup_street_number, pickup_route,
+            dropoff_street_number, dropoff_route,
+            owner_commission_cents, driver_earnings_cents,
             status, fare_estimate_cents, payment_status,
             matched_at
-          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'matched', ?, 'unpaid', datetime('now'))
+          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'matched', ?, ?, datetime('now'))
         `
         )
         .run(
@@ -127,10 +147,22 @@ router.post("/", authRequired, roleRequired("customer"), (req, res) => {
           data.dropoff_text,
           data.dropoff_lat,
           data.dropoff_lng,
-          fare_estimate_cents
+          data.pickup_street_number || null,
+          data.pickup_route || null,
+          data.dropoff_street_number || null,
+          data.dropoff_route || null,
+          split.owner_commission_cents,
+          split.driver_earnings_cents,
+          fare_estimate_cents,
+          initialPaymentStatus
         );
       rideId = Number(info.lastInsertRowid);
       insertEvent.run(rideId, "ride_matched", `Matched with driver ${match.user_id}`);
+      insertEvent.run(
+        rideId,
+        "payment_method_selected",
+        `Payment method: ${paymentMethod}`
+      );
     } else {
       const info = db
         .prepare(
@@ -139,8 +171,11 @@ router.post("/", authRequired, roleRequired("customer"), (req, res) => {
             customer_id, driver_id, vehicle_type,
             pickup_text, pickup_lat, pickup_lng,
             dropoff_text, dropoff_lat, dropoff_lng,
+            pickup_street_number, pickup_route,
+            dropoff_street_number, dropoff_route,
+            owner_commission_cents, driver_earnings_cents,
             status, fare_estimate_cents, payment_status
-          ) VALUES (?, NULL, ?, ?, ?, ?, ?, ?, ?, 'requested', ?, 'unpaid')
+          ) VALUES (?, NULL, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'requested', ?, ?)
         `
         )
         .run(
@@ -152,10 +187,22 @@ router.post("/", authRequired, roleRequired("customer"), (req, res) => {
           data.dropoff_text,
           data.dropoff_lat,
           data.dropoff_lng,
-          fare_estimate_cents
+          data.pickup_street_number || null,
+          data.pickup_route || null,
+          data.dropoff_street_number || null,
+          data.dropoff_route || null,
+          split.owner_commission_cents,
+          split.driver_earnings_cents,
+          fare_estimate_cents,
+          initialPaymentStatus
         );
       rideId = Number(info.lastInsertRowid);
       insertEvent.run(rideId, "ride_requested", "Ride requested; awaiting match");
+      insertEvent.run(
+        rideId,
+        "payment_method_selected",
+        `Payment method: ${paymentMethod}`
+      );
     }
 
     return { rideId, matchedDriverId: match?.user_id || null };
@@ -345,9 +392,11 @@ router.post(
       return res.status(400).json({ error: "invalid_status_transition" });
     }
 
+    const finalCents = ride.fare_estimate_cents;
+    const split = splitFareCents(finalCents);
     db.prepare(
-      "UPDATE rides SET payment_status='requires_payment', final_fare_cents=? WHERE id=?"
-    ).run(ride.fare_estimate_cents, rideId);
+      "UPDATE rides SET payment_status='requires_payment', final_fare_cents=?, owner_commission_cents=?, driver_earnings_cents=? WHERE id=?"
+    ).run(finalCents, split.owner_commission_cents, split.driver_earnings_cents, rideId);
 
     db.prepare(
       "INSERT INTO ride_events (ride_id, type, message) VALUES (?, 'payment_required', 'Payment required to complete ride')"
@@ -393,9 +442,13 @@ router.post("/:id/complete", authRequired, roleRequired("driver"), (req, res) =>
     "INSERT INTO ride_events (ride_id, type, message) VALUES (?, 'ride_completed', 'Ride completed')"
   ).run(rideId);
 
+  const driverShare =
+    ride.driver_earnings_cents != null
+      ? Number(ride.driver_earnings_cents)
+      : Number(ride.final_fare_cents ?? ride.fare_estimate_cents);
   db.prepare(
     "UPDATE driver_profiles SET earnings_cents = earnings_cents + ?, updated_at=datetime('now') WHERE user_id=?"
-  ).run(ride.final_fare_cents ?? ride.fare_estimate_cents, u.id);
+  ).run(driverShare, u.id);
 
   const updated = db.prepare("SELECT * FROM rides WHERE id=?").get(rideId);
   const io = req.app.locals.io;

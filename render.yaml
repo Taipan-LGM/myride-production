@@ -1,0 +1,37 @@
+# My Ride — Render Blueprint
+# https://render.com/docs/infrastructure-as-code
+#
+# Notes:
+# - Persistent disks require a paid web service. This file defaults to `plan: starter`
+#   with a small disk so SQLite survives redeploys.
+# - For a $0 demo: set `plan: free`, remove the entire `disk:` block, and set
+#   `SQLITE_PATH` to `./myride.sqlite` (ephemeral; data is lost on redeploy/restart).
+# - `repo` is omitted on purpose; Render defaults it to the repo you connect.
+# Optional env vars to add in the dashboard after deploy: EXTRA_APP_ORIGINS,
+# HELMET_DISABLE_CSP, STRIPE_ALLOW_TEST_KEYS_IN_PRODUCTION, ALLOW_MOCK_LOGICLINE.
+
+services:
+  - type: web
+    name: my-ride
+    runtime: node
+    plan: starter
+    buildCommand: npm install
+    startCommand: npm start
+    healthCheckPath: /api/health
+    disk:
+      name: sqlite-data
+      mountPath: /var/data
+      sizeGB: 1
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: HOST
+        value: 0.0.0.0
+      - key: JWT_SECRET
+        generateValue: true
+      - key: SQLITE_PATH
+        value: /var/data/myride.sqlite
+      - key: STRIPE_SECRET_KEY
+        sync: false
+      - key: STRIPE_WEBHOOK_SECRET
+        sync: false

@@ -183,13 +183,13 @@ router.post("/complete", (req, res) => {
         .get(userId);
 
       // Create driver profile if missing
-      insertProfile.run(userId, `QR-${external_driver_id}`.slice(0, 20), "Mini");
+      insertProfile.run(userId, `QR-${external_driver_id}`.slice(0, 20), "Car");
     } else {
       const profile = db
         .prepare("SELECT user_id FROM driver_profiles WHERE user_id=?")
         .get(user.id);
       if (!profile) {
-        insertProfile.run(user.id, `QR-${external_driver_id}`.slice(0, 20), "Mini");
+        insertProfile.run(user.id, `QR-${external_driver_id}`.slice(0, 20), "Car");
       }
     }
 

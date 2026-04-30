@@ -1,14 +1,24 @@
 import express from "express";
+import rateLimit from "express-rate-limit";
 import { z } from "zod";
 import { db } from "../database.js";
 import {
   authRequired,
+  roleRequired,
   hashPassword,
   signToken,
   verifyPassword,
 } from "../auth.js";
 
 const router = express.Router();
+
+const authRouteLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 40,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: "too_many_requests" },
+});
 
 const emailSchema = z.string().trim().toLowerCase().email();
 const passwordSchema = z.string().min(8).max(72);
@@ -20,11 +30,11 @@ const registerSchema = z.object({
   password: passwordSchema,
   name: nameSchema,
   license_plate: z.string().trim().min(2).max(20).optional(),
-  vehicle_type: z.enum(["Auto", "Mini", "Sedan", "Bike"]).optional(),
+  vehicle_type: z.enum(["Car", "MPV"]).optional(),
   photo_url: z.string().trim().min(3).max(500).optional(),
 });
 
-router.post("/register", (req, res) => {
+router.post("/register", authRouteLimiter, (req, res) => {
   const parsed = registerSchema.safeParse(req.body);
   if (!parsed.success) {
     return res
@@ -87,7 +97,7 @@ const loginSchema = z.object({
   password: passwordSchema,
 });
 
-router.post("/login", (req, res) => {
+router.post("/login", authRouteLimiter, (req, res) => {
   const parsed = loginSchema.safeParse(req.body);
   if (!parsed.success) {
     return res
@@ -119,12 +129,26 @@ router.get("/me", authRequired, (req, res) => {
   if (user.role === "driver") {
     const profile = db
       .prepare(
-        "SELECT user_id, license_plate, vehicle_type, photo_url, approval_status, online, lat, lng, earnings_cents FROM driver_profiles WHERE user_id=?"
+        "SELECT user_id, license_plate, vehicle_type, photo_url, approval_status, online, lat, lng, earnings_cents, wallet_address FROM driver_profiles WHERE user_id=?"
       )
       .get(user.id);
     return res.json({ user, driver_profile: profile || null });
   }
   return res.json({ user });
+});
+
+// Driver can update wallet address for payouts.
+router.patch("/driver-profile", authRequired, roleRequired("driver"), (req, res) => {
+  const wallet = String(req.body?.wallet_address || "").trim().slice(0, 120);
+  db.prepare(
+    "UPDATE driver_profiles SET wallet_address=?, updated_at=datetime('now') WHERE user_id=?"
+  ).run(wallet || null, req.user.id);
+  const profile = db
+    .prepare(
+      "SELECT user_id, license_plate, vehicle_type, photo_url, approval_status, online, lat, lng, earnings_cents, wallet_address FROM driver_profiles WHERE user_id=?"
+    )
+    .get(req.user.id);
+  return res.json({ ok: true, driver_profile: profile || null });
 });
 
 export default router;

@@ -11,6 +11,17 @@
   --danger: #ff5a7a;
   --ok: #44d7a8;
 
+  --neon-yellow-1: #cfff04;
+  --neon-yellow-2: #ffd400;
+  --neon-orange-1: #ff5f1f;
+  --neon-orange-2: #ffb000;
+  --neon-red-1: #ff3d7a;
+  --neon-red-2: #ff2d2d;
+  --neon-green-1: #44d7a8;
+  --neon-green-2: #9dff5b;
+  --neon-blue-1: #00d4ff;
+  --neon-blue-2: #0066ff;
+
   --radius: 16px;
 }
 
@@ -64,6 +75,232 @@ a {
   display: flex;
   align-items: center;
   justify-content: space-between;
+  gap: 14px;
+  flex-wrap: wrap;
+}
+
+.viewport-toolbar {
+  display: inline-flex;
+  align-items: center;
+  flex-wrap: nowrap;
+  gap: 6px;
+  margin-left: 12px;
+}
+
+.viewport-toolbar-label {
+  font-size: 11px;
+  font-weight: 750;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--muted);
+  margin-right: 2px;
+}
+
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+.viewport-ic {
+  display: block;
+}
+
+.viewport-btn.is-active {
+  box-shadow: 0 0 0 2px rgba(38, 208, 206, 0.55);
+  border-color: rgba(38, 208, 206, 0.45);
+  color: var(--text);
+}
+
+.viewport-btn:disabled {
+  opacity: 0.38;
+  cursor: not-allowed;
+  transform: none;
+}
+
+/* Simulated device widths (desktop only — real phones use full width; JS disables preview when narrow). */
+html[data-viewport="tablet"] #app {
+  max-width: 834px;
+  margin: 0 auto;
+  min-height: 100vh;
+  border-radius: 18px;
+  border: 1px solid var(--border);
+  box-shadow: 0 0 0 9999px rgba(0, 0, 0, 0.28);
+  overflow-x: hidden;
+}
+
+html[data-viewport="phone"] #app {
+  max-width: 390px;
+  margin: 0 auto;
+  min-height: 100vh;
+  border-radius: 22px;
+  border: 1px solid var(--border);
+  box-shadow: 0 0 0 9999px rgba(0, 0, 0, 0.32);
+  overflow-x: hidden;
+}
+
+@media (max-width: 640px) {
+  .viewport-toolbar-label {
+    display: none;
+  }
+}
+
+.brand-main {
+  display: flex;
+  flex-direction: column;
+  min-width: 180px;
+}
+
+.topbar-actions {
+  margin-left: auto;
+}
+
+@media (max-width: 860px) {
+  .viewport-toolbar {
+    margin-left: 0;
+  }
+}
+
+/* Phone: keep topbar buttons inline (scroll instead of wrapping) */
+@media (max-width: 520px) {
+  .topbar {
+    flex-wrap: wrap;
+    overflow-x: visible;
+    gap: 10px;
+  }
+
+  .brand {
+    flex: 0 0 auto;
+    min-width: 0;
+  }
+
+  .brand-main {
+    min-width: 0;
+    max-width: 160px;
+  }
+
+  .brand-title,
+  .brand-subtitle {
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .viewport-toolbar {
+    flex: 0 0 auto;
+    white-space: nowrap;
+  }
+
+  .topbar-actions {
+    order: 5;
+    width: 100%;
+    margin-left: 0;
+    justify-content: flex-end;
+    gap: 8px;
+    flex-wrap: nowrap;
+    overflow: visible;
+  }
+  .topbar-actions .btn {
+    flex: 0 0 auto;
+    padding: 7px 9px;
+    border-radius: 12px;
+    font-size: 11px;
+    white-space: nowrap;
+  }
+  .viewport-toolbar .btn.xs {
+    padding: 7px 9px;
+  }
+
+  /* Home hero CTA row: keep the three buttons on one line */
+  .hero-cta {
+    flex-wrap: nowrap;
+    gap: 8px;
+    justify-content: flex-end;
+  }
+  .hero-cta .btn {
+    padding: 9px 10px;
+    border-radius: 12px;
+    font-size: 11px;
+    white-space: nowrap;
+  }
+}
+
+/* Phone preview mode (desktop “Phone” view) should behave like a real phone width */
+html[data-viewport="phone"] .topbar {
+  flex-wrap: wrap;
+  overflow-x: visible;
+  gap: 10px;
+}
+
+html[data-viewport="phone"] .brand {
+  flex: 0 0 auto;
+  min-width: 0;
+}
+
+html[data-viewport="phone"] .brand-main {
+  min-width: 0;
+  max-width: 160px;
+}
+
+html[data-viewport="phone"] .brand-title,
+html[data-viewport="phone"] .brand-subtitle {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+html[data-viewport="phone"] .viewport-toolbar {
+  margin-left: 0;
+  flex: 0 0 auto;
+  flex-wrap: nowrap;
+  white-space: nowrap;
+}
+
+html[data-viewport="phone"] .topbar-actions {
+  order: 5;
+  width: 100%;
+  margin-left: 0;
+  justify-content: flex-end;
+  flex-wrap: nowrap;
+  overflow: visible;
+  gap: 8px;
+}
+
+html[data-viewport="phone"] .topbar-actions .btn {
+  flex: 0 0 auto;
+  padding: 7px 9px;
+  border-radius: 12px;
+  font-size: 11px;
+  white-space: nowrap;
+}
+
+html[data-viewport="phone"] .viewport-toolbar .btn.xs {
+  padding: 7px 9px;
+}
+
+html[data-viewport="phone"] .hero-cta {
+  flex-wrap: nowrap;
+  gap: 8px;
+  justify-content: flex-end;
+}
+
+html[data-viewport="phone"] .hero-cta .btn {
+  padding: 9px 10px;
+  border-radius: 12px;
+  font-size: 11px;
+  white-space: nowrap;
+}
+
+/* Active tab state (glow/boost only — color comes from data-role) */
+.nav-link.is-active {
+  filter: brightness(1.08) saturate(1.05);
+  transform: translateY(-1px);
 }
 
 .brand {
@@ -82,6 +319,16 @@ a {
   letter-spacing: 0.02em;
   background: linear-gradient(135deg, var(--accent), var(--accent2));
   box-shadow: var(--shadow);
+  overflow: hidden;
+}
+
+.logo img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  border-radius: 14px;
+  filter: drop-shadow(0 10px 18px rgba(0, 0, 0, 0.25));
 }
 
 .brand-title {
@@ -104,13 +351,17 @@ a {
 .btn {
   appearance: none;
   border: 1px solid transparent;
-  background: linear-gradient(135deg, var(--accent), var(--accent2));
+  background: linear-gradient(
+    135deg,
+    var(--btn1, var(--accent)),
+    var(--btn2, var(--accent2))
+  );
   color: #0b1220;
   font-weight: 750;
   padding: 10px 14px;
   border-radius: 14px;
   cursor: pointer;
-  box-shadow: 0 10px 28px rgba(109, 94, 252, 0.22);
+  box-shadow: 0 10px 28px var(--btnShadow, rgba(109, 94, 252, 0.22));
   transition: transform 0.08s ease, opacity 0.2s ease;
   display: inline-flex;
   align-items: center;
@@ -127,10 +378,47 @@ a {
 }
 
 .btn.ghost {
-  background: rgba(255, 255, 255, 0.06);
-  border-color: var(--border);
-  color: var(--text);
-  box-shadow: none;
+  border-color: transparent;
+}
+
+/* Role-based button gradients */
+.btn[data-role="customer"],
+.btn.ghost[data-role="customer"],
+.nav-link[data-role="customer"] {
+  --btn1: var(--neon-yellow-1);
+  --btn2: var(--neon-yellow-2);
+  --btnShadow: rgba(207, 255, 4, 0.18);
+}
+
+.btn[data-role="driver"],
+.btn.ghost[data-role="driver"],
+.nav-link[data-role="driver"] {
+  --btn1: var(--neon-orange-1);
+  --btn2: var(--neon-orange-2);
+  --btnShadow: rgba(255, 95, 31, 0.18);
+}
+
+.btn[data-role="admin"],
+.btn.ghost[data-role="admin"],
+.nav-link[data-role="admin"] {
+  --btn1: var(--neon-red-1);
+  --btn2: var(--neon-red-2);
+  --btnShadow: rgba(255, 61, 122, 0.18);
+}
+
+.btn[data-role="ok"],
+.btn.ghost[data-role="ok"] {
+  --btn1: var(--neon-green-1);
+  --btn2: var(--neon-green-2);
+  --btnShadow: rgba(68, 215, 168, 0.22);
+}
+
+#btnLogout.btn {
+  --btn1: var(--neon-blue-1);
+  --btn2: var(--neon-blue-2);
+  --btnShadow: rgba(0, 180, 255, 0.35);
+  color: #ffffff;
+  text-shadow: 0 1px 0 rgba(0, 0, 0, 0.2);
 }
 
 .btn.xs {
@@ -221,6 +509,41 @@ a {
   color: var(--text);
   outline: none;
 }
+
+.pw-wrap {
+  position: relative;
+  width: 100%;
+}
+
+.password-input {
+  padding-right: 44px;
+}
+
+.pw-toggle {
+  appearance: none;
+  position: absolute;
+  right: 8px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 34px;
+  height: 34px;
+  border-radius: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  background: rgba(255, 255, 255, 0.06);
+  color: rgba(232, 238, 252, 0.92);
+  cursor: pointer;
+  display: grid;
+  place-items: center;
+}
+
+.pw-toggle:hover {
+  background: rgba(255, 255, 255, 0.09);
+}
+
+.pw-toggle.is-on {
+  border-color: rgba(38, 208, 206, 0.45);
+  box-shadow: 0 0 0 2px rgba(38, 208, 206, 0.22);
+}
 .textarea {
   min-height: 92px;
   resize: vertical;
@@ -235,17 +558,183 @@ a {
   box-shadow: 0 0 0 4px rgba(109, 94, 252, 0.18);
 }
 
+.input.input-loading {
+  background-image: linear-gradient(
+    90deg,
+    rgba(255, 255, 255, 0.06),
+    rgba(109, 94, 252, 0.22),
+    rgba(255, 255, 255, 0.06)
+  );
+  background-size: 200% 100%;
+  animation: addr-loading-shimmer 0.9s ease-in-out infinite;
+}
+
+@keyframes addr-loading-shimmer {
+  0% {
+    background-position: 100% 0;
+  }
+  100% {
+    background-position: -100% 0;
+  }
+}
+
+.address-field {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.address-field-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.address-actions {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+  justify-content: flex-end;
+}
+
+.address-field-label {
+  font-size: 13px;
+  font-weight: 750;
+  letter-spacing: 0.02em;
+  color: var(--text);
+}
+
+.coords-details {
+  border-radius: 12px;
+  border: 1px solid var(--border);
+  padding: 8px 12px;
+  background: rgba(255, 255, 255, 0.03);
+}
+
+.coords-details summary {
+  cursor: pointer;
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.booking-map {
+  width: 100%;
+  height: 240px;
+  border-radius: 14px;
+  overflow: hidden;
+  border: 1px solid var(--border);
+  margin-top: 8px;
+}
+
+.suggest-box {
+  position: absolute;
+  z-index: 40;
+  border-radius: 14px;
+  border: 1px solid var(--border);
+  background: rgba(11, 18, 32, 0.96);
+  box-shadow: var(--shadow);
+  overflow: hidden;
+  max-height: 220px;
+  overflow-y: auto;
+}
+
+.suggest-box-portal {
+  position: fixed;
+  left: 0;
+  top: 0;
+  right: auto;
+  bottom: auto;
+  z-index: 2000;
+}
+
+.suggest-item {
+  appearance: none;
+  width: 100%;
+  text-align: left;
+  padding: 10px 12px;
+  border: 0;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  background: transparent;
+  color: var(--text);
+  cursor: pointer;
+  font-size: 13px;
+}
+
+.suggest-item:hover {
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.suggest-item.is-primary {
+  background: rgba(109, 94, 252, 0.12);
+  border-bottom-color: rgba(109, 94, 252, 0.25);
+}
+
+.input-wrap {
+  width: 100%;
+}
+
 .hero {
   display: grid;
-  grid-template-columns: 1.3fr 0.7fr;
+  grid-template-columns: 1fr;
   gap: 16px;
   align-items: start;
 }
 
-@media (max-width: 980px) {
-  .hero {
-    grid-template-columns: 1fr;
+/* Home hero: keep text anchored top-left */
+.hero-left {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  text-align: left;
+  position: relative;
+  padding-top: 0;
+  padding-right: 220px; /* keep text clear of the logo on the right */
+}
+
+.hero-toptext {
+  margin-top: 5mm;
+}
+
+.hero-left .badge {
+  margin-top: 0;
+}
+
+.hero-left .h1 {
+  margin-top: 0;
+}
+
+.hero-left .slogan {
+  margin-top: 4px;
+}
+
+@media (max-width: 520px) {
+  .hero-left {
+    padding-right: 0;
   }
+}
+
+/* Viewport preview modes should behave like real narrow devices */
+html[data-viewport="phone"] .hero-left,
+html[data-viewport="tablet"] .hero-left {
+  padding-right: 0;
+}
+
+/* Home page: always stack the 4 panels vertically (all viewports) */
+.home-panels {
+  margin-top: calc(14px + 10mm);
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 12px;
+  width: 100%;
+}
+
+.home-panels > * {
+  width: 100%;
+  max-width: 100%;
+  justify-self: stretch;
 }
 
 .h1 {
@@ -271,18 +760,49 @@ a {
   display: flex;
   gap: 10px;
   flex-wrap: wrap;
+  width: 100%;
+  justify-content: flex-end;
 }
 
 .badge {
   display: inline-flex;
   padding: 6px 10px;
   border-radius: 999px;
-  border: 1px solid var(--border);
+  border: 1px solid rgba(255, 95, 31, 0.55);
   background: rgba(255, 255, 255, 0.06);
   color: rgba(232, 238, 252, 0.86);
   font-size: 12px;
   font-weight: 700;
   width: fit-content;
+  box-shadow: 0 0 0 2px rgba(255, 95, 31, 0.18), 0 0 22px rgba(255, 95, 31, 0.22);
+}
+
+.hero-logo-wrap {
+  position: absolute;
+  top: 0;
+  left: 50%;
+  transform: translateX(calc(-50% + 30mm));
+  display: flex;
+  justify-content: center;
+  width: auto;
+  margin: 0;
+}
+
+.hero-logo {
+  width: 160px;
+  max-width: 38vw;
+  height: auto;
+  object-fit: contain;
+  border-radius: 18px;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  filter: drop-shadow(0 18px 38px rgba(0, 0, 0, 0.45));
+  transform: none;
+}
+
+@media (max-width: 520px) {
+  .hero-logo {
+    width: 120px;
+  }
 }
 
 .mini {
@@ -481,6 +1001,21 @@ a {
   box-shadow: var(--shadow);
 }
 
+/* Make popup proportional to chosen viewport preview */
+html[data-viewport="tablet"] .modal-card {
+  width: min(720px, 100%);
+}
+
+html[data-viewport="phone"] .modal-card {
+  width: min(360px, 100%);
+}
+
+@media (max-width: 520px) {
+  .modal-card {
+    width: min(360px, 100%);
+  }
+}
+
 .modal-h {
   position: sticky;
   top: 0;
@@ -499,6 +1034,50 @@ a {
 
 .modal-b {
   padding: 14px;
+}
+
+.popup-msg {
+  text-align: center;
+  font-size: 26px; /* ~2x muted text */
+  line-height: 1.35;
+  font-weight: 800;
+  margin: 8px 0 16px;
+}
+
+.popup-actions {
+  display: flex;
+  justify-content: center;
+}
+
+.popup-actions .btn[data-role="ok"] {
+  width: auto;
+  padding: 10px 16px;
+}
+
+.popup-close {
+  appearance: none;
+  width: 34px;
+  height: 34px;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  background: linear-gradient(135deg, var(--neon-red-1), var(--neon-red-2));
+  color: #fff;
+  font-size: 22px;
+  line-height: 1;
+  font-weight: 900;
+  cursor: pointer;
+  box-shadow: 0 10px 28px rgba(255, 61, 122, 0.22);
+  display: grid;
+  place-items: center;
+}
+
+.popup-close:hover {
+  transform: translateY(-1px);
+}
+
+.popup-close:active {
+  transform: translateY(0px);
+  opacity: 0.92;
 }
 
 .qr-video {

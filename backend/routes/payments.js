@@ -3,16 +3,34 @@ import Stripe from "stripe";
 import { z } from "zod";
 import { db } from "../database.js";
 import { authRequired, roleRequired } from "../auth.js";
+import { createRidePaymentIntent } from "../services/ridePaymentIntent.js";
 
 const router = express.Router();
+const NODE_ENV = process.env.NODE_ENV || "development";
 
 const stripeSecret = process.env.STRIPE_SECRET_KEY || "";
 const stripe = new Stripe(stripeSecret, { apiVersion: "2024-06-20" });
 
+function stripeCurrency() {
+  const row = db
+    .prepare("SELECT currency FROM app_settings WHERE id=1")
+    .get();
+  const c = String(row?.currency || "USD").toLowerCase();
+  return c;
+}
+
+const publicAppBase = process.env.RENDER_EXTERNAL_URL?.trim().replace(/\/$/, "") || "";
+
 const SUCCESS_URL =
-  process.env.STRIPE_SUCCESS_URL || "http://localhost:3000/#/customer?paid=1";
+  process.env.STRIPE_SUCCESS_URL ||
+  (publicAppBase
+    ? `${publicAppBase}/#/customer?paid=1`
+    : "http://localhost:3000/#/customer?paid=1");
 const CANCEL_URL =
-  process.env.STRIPE_CANCEL_URL || "http://localhost:3000/#/customer?paid=0";
+  process.env.STRIPE_CANCEL_URL ||
+  (publicAppBase
+    ? `${publicAppBase}/#/customer?paid=0`
+    : "http://localhost:3000/#/customer?paid=0");
 
 function assertStripeConfigured() {
   if (!stripeSecret || !stripeSecret.startsWith("sk_")) {
@@ -21,6 +39,20 @@ function assertStripeConfigured() {
     throw err;
   }
 }
+
+router.get("/public-config", (_req, res) => {
+  return res.json({
+    publishable_key: process.env.STRIPE_PUBLISHABLE_KEY || "",
+    currency: stripeCurrency(),
+  });
+});
+
+router.post(
+  "/create-ride-payment",
+  authRequired,
+  roleRequired("customer"),
+  createRidePaymentIntent
+);
 
 const createCheckoutSchema = z.object({
   ride_id: z.number().int().positive(),
@@ -65,7 +97,8 @@ router.post(
           {
             quantity: 1,
             price_data: {
-              currency: "usd",
+              // Currency is set by Admin Settings (app_settings.currency)
+              currency: stripeCurrency(),
               unit_amount: amount,
               product_data: {
                 name: `My Ride Trip #${ride.id}`,
@@ -102,7 +135,10 @@ router.post("/webhook", async (req, res) => {
     const sig = req.headers["stripe-signature"];
     event = stripe.webhooks.constructEvent(req.rawBody, sig, webhookSecret);
   } catch (err) {
-    return res.status(400).send(`Webhook Error: ${err.message}`);
+    if (NODE_ENV !== "production") {
+      return res.status(400).send(`Webhook Error: ${err.message}`);
+    }
+    return res.status(400).send("Webhook signature verification failed");
   }
 
   try {
@@ -141,11 +177,42 @@ router.post("/webhook", async (req, res) => {
       }
     }
 
+    if (event.type === "payment_intent.succeeded") {
+      const pi = event.data.object;
+      const rideId = Number(pi.metadata?.ride_id);
+      if (Number.isFinite(rideId)) {
+        db.prepare(
+          "UPDATE rides SET payment_status='paid', stripe_payment_intent_id=? WHERE id=?"
+        ).run(String(pi.id), rideId);
+        db.prepare(
+          "INSERT INTO ride_events (ride_id, type, message) VALUES (?, 'payment_paid', 'Stripe PaymentIntent succeeded')"
+        ).run(rideId);
+
+        const updated = db.prepare("SELECT * FROM rides WHERE id=?").get(rideId);
+        try {
+          const io = req.app?.locals?.io;
+          if (io && updated) {
+            io.to(`user:${updated.customer_id}`).emit("ride:updated", { ride: updated });
+            if (updated.driver_id) {
+              io.to(`driver:${updated.driver_id}`).emit("ride:updated", { ride: updated });
+            }
+            io.to("admin").emit("ride:updated", { ride: updated });
+          }
+        } catch {
+          // ignore
+        }
+      }
+    }
+
     if (event.type === "payment_intent.payment_failed") {
       const pi = event.data.object;
-      const ride = db
-        .prepare("SELECT * FROM rides WHERE stripe_payment_intent_id=?")
-        .get(String(pi.id));
+      let ride =
+        db.prepare("SELECT * FROM rides WHERE stripe_payment_intent_id=?").get(String(pi.id)) ||
+        null;
+      if (!ride) {
+        const rid = Number(pi.metadata?.ride_id);
+        if (Number.isFinite(rid)) ride = db.prepare("SELECT * FROM rides WHERE id=?").get(rid);
+      }
       if (ride) {
         db.prepare("UPDATE rides SET payment_status='failed' WHERE id=?").run(ride.id);
         db.prepare(
@@ -159,6 +226,47 @@ router.post("/webhook", async (req, res) => {
     return res.status(500).send("Webhook handler failure");
   }
 });
+
+// Dev-only: simulate a successful card payment for a ride.
+router.post(
+  "/mock-pay",
+  authRequired,
+  roleRequired("customer"),
+  (req, res) => {
+    const allow =
+      process.env.ALLOW_MOCK_PAYMENTS === "1" || process.env.NODE_ENV !== "production";
+    if (!allow) return res.status(404).json({ error: "not_found" });
+
+    const rideId = Number(req.body?.ride_id);
+    if (!Number.isFinite(rideId)) return res.status(400).json({ error: "invalid_ride_id" });
+
+    const ride = db.prepare("SELECT * FROM rides WHERE id=?").get(rideId);
+    if (!ride) return res.status(404).json({ error: "ride_not_found" });
+    if (ride.customer_id !== req.user.id) return res.status(403).json({ error: "forbidden" });
+
+    db.prepare(
+      "UPDATE rides SET payment_status='paid', stripe_payment_intent_id=COALESCE(stripe_payment_intent_id, ?) WHERE id=?"
+    ).run(`mock_pi_${Date.now()}`, rideId);
+
+    db.prepare(
+      "INSERT INTO ride_events (ride_id, type, message) VALUES (?, 'payment_paid', 'Payment simulated (dev)')"
+    ).run(rideId);
+
+    const updated = db.prepare("SELECT * FROM rides WHERE id=?").get(rideId);
+    try {
+      const io = req.app?.locals?.io;
+      if (io && updated) {
+        io.to(`user:${updated.customer_id}`).emit("ride:updated", { ride: updated });
+        if (updated.driver_id) io.to(`driver:${updated.driver_id}`).emit("ride:updated", { ride: updated });
+        io.to("admin").emit("ride:updated", { ride: updated });
+      }
+    } catch {
+      // ignore
+    }
+
+    return res.json({ ok: true, ride: updated });
+  }
+);
 
 export default router;
 

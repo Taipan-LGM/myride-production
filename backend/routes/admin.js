@@ -22,7 +22,7 @@ router.get("/drivers", (_req, res) => {
       SELECT
         u.id, u.email, u.name, u.created_at,
         dp.license_plate, dp.vehicle_type, dp.photo_url,
-        dp.approval_status, dp.online, dp.lat, dp.lng, dp.earnings_cents, dp.updated_at
+        dp.approval_status, dp.online, dp.lat, dp.lng, dp.earnings_cents, dp.wallet_address, dp.updated_at
       FROM users u
       JOIN driver_profiles dp ON dp.user_id = u.id
       WHERE u.role='driver'
@@ -144,7 +144,7 @@ router.get("/analytics", (_req, res) => {
 router.post("/seed-drivers", (_req, res) => {
   const cityLat = 40.7128;
   const cityLng = -74.006;
-  const vehicleTypes = ["Auto", "Mini", "Sedan", "Bike"];
+  const vehicleTypes = ["Car", "MPV"];
   const count = 8;
 
   const insertUser = db.prepare(

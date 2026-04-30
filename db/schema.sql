@@ -16,13 +16,14 @@ CREATE TABLE IF NOT EXISTS users (
 CREATE TABLE IF NOT EXISTS driver_profiles (
   user_id           INTEGER PRIMARY KEY,
   license_plate     TEXT NOT NULL,
-  vehicle_type      TEXT NOT NULL CHECK (vehicle_type IN ('Auto','Mini','Sedan','Bike')),
+  vehicle_type      TEXT NOT NULL CHECK (vehicle_type IN ('Car','MPV','Auto','Mini','Sedan','Bike')),
   photo_url         TEXT,
   approval_status   TEXT NOT NULL DEFAULT 'pending' CHECK (approval_status IN ('pending','approved','rejected')),
   online            INTEGER NOT NULL DEFAULT 0 CHECK (online IN (0,1)),
   lat               REAL,
   lng               REAL,
   earnings_cents    INTEGER NOT NULL DEFAULT 0,
+  wallet_address    TEXT,
   updated_at        TEXT NOT NULL DEFAULT (datetime('now')),
   FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
 );
@@ -40,15 +41,19 @@ CREATE TABLE IF NOT EXISTS rides (
   id                      INTEGER PRIMARY KEY AUTOINCREMENT,
   customer_id             INTEGER NOT NULL,
   driver_id               INTEGER,
-  vehicle_type            TEXT NOT NULL CHECK (vehicle_type IN ('Auto','Mini','Sedan','Bike')),
+  vehicle_type            TEXT NOT NULL CHECK (vehicle_type IN ('Car','MPV','Auto','Mini','Sedan','Bike')),
 
   pickup_text             TEXT NOT NULL,
   pickup_lat              REAL NOT NULL,
   pickup_lng              REAL NOT NULL,
+  pickup_street_number    TEXT,
+  pickup_route            TEXT,
 
   dropoff_text            TEXT NOT NULL,
   dropoff_lat             REAL NOT NULL,
   dropoff_lng             REAL NOT NULL,
+  dropoff_street_number   TEXT,
+  dropoff_route           TEXT,
 
   status                  TEXT NOT NULL CHECK (status IN ('requested','matched','accepted','arriving','in_progress','completed','cancelled')),
   fare_estimate_cents     INTEGER NOT NULL,
@@ -64,6 +69,12 @@ CREATE TABLE IF NOT EXISTS rides (
   stripe_checkout_session_id TEXT,
   stripe_payment_intent_id   TEXT,
 
+  owner_commission_cents    INTEGER,
+  driver_earnings_cents     INTEGER,
+  payout_status             TEXT NOT NULL DEFAULT 'unpaid',
+  zoneless_transfer_id      TEXT,
+  zoneless_payout_id        TEXT,
+
   dispute_note            TEXT,
 
   FOREIGN KEY (customer_id) REFERENCES users(id) ON DELETE RESTRICT,
@@ -73,6 +84,15 @@ CREATE TABLE IF NOT EXISTS rides (
 CREATE INDEX IF NOT EXISTS idx_rides_customer_id ON rides(customer_id);
 CREATE INDEX IF NOT EXISTS idx_rides_driver_id ON rides(driver_id);
 CREATE INDEX IF NOT EXISTS idx_rides_status ON rides(status);
+
+-- Owner / platform revenue split (percent integers, must sum to 100)
+CREATE TABLE IF NOT EXISTS platform_settings (
+  id INTEGER PRIMARY KEY CHECK (id=1),
+  owner_commission_pct INTEGER NOT NULL DEFAULT 51 CHECK (owner_commission_pct >= 0 AND owner_commission_pct <= 100),
+  driver_earnings_pct   INTEGER NOT NULL DEFAULT 49 CHECK (driver_earnings_pct >= 0 AND driver_earnings_pct <= 100),
+  updated_at            TEXT NOT NULL DEFAULT (datetime('now'))
+);
+INSERT OR IGNORE INTO platform_settings (id) VALUES (1);
 
 -- Ride events (timeline)
 CREATE TABLE IF NOT EXISTS ride_events (

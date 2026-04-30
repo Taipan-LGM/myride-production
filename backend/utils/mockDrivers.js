@@ -7,7 +7,7 @@ function main() {
   const cityLat = 40.7128; // NYC default
   const cityLng = -74.006;
 
-  const vehicleTypes = ["Auto", "Mini", "Sedan", "Bike"];
+  const vehicleTypes = ["Car", "MPV"];
   const count = 8;
 
   // bcrypt hash for password "Driver12345!" with cost 10

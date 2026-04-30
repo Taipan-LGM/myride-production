@@ -1,17 +1,22 @@
 {
   "name": "my-ride",
-  "version": "1.0.0",
+  "version": "1.0.2",
   "private": true,
   "description": "My Ride - e-hailing web ecosystem (marketing + customer + driver + admin) in one web app",
   "main": "backend/server.js",
   "type": "module",
   "scripts": {
     "dev": "nodemon --exec /usr/bin/node backend/server.js",
-    "start": "/usr/bin/node backend/server.js",
-    "db:init": "/usr/bin/node -e \"const fs=require('fs'); const path=require('path'); const Database=require('better-sqlite3'); require('dotenv').config(); const dbPath=process.env.SQLITE_PATH||'./mycab.sqlite'; const schema=fs.readFileSync(path.join('db','schema.sql'),'utf8'); const db=new Database(dbPath); db.exec(schema); db.close(); console.log('DB initialized at', dbPath);\"",
-    "seed:drivers": "/usr/bin/node backend/utils/mockDrivers.js"
+    "start": "node backend/server.js",
+    "deploy:check": "node scripts/deploy-check.mjs",
+    "db:init": "node -e \"const fs=require('fs'); const path=require('path'); const Database=require('better-sqlite3'); require('dotenv').config(); const dbPath=process.env.SQLITE_PATH||'./mycab.sqlite'; const schema=fs.readFileSync(path.join('db','schema.sql'),'utf8'); const db=new Database(dbPath); db.exec(schema); db.close(); console.log('DB initialized at', dbPath);\"",
+    "seed:drivers": "node backend/utils/mockDrivers.js"
+  },
+  "engines": {
+    "node": ">=20"
   },
   "dependencies": {
+    "@zoneless/node": "^0.1.0",
     "bcryptjs": "^2.4.3",
     "better-sqlite3": "^11.10.0",
     "cors": "^2.8.5",
