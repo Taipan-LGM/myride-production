@@ -4,8 +4,22 @@ import { logger } from "../lib/logger.js";
 import { PaymentError } from "../errors/index.js";
 import { emitRideUpdated } from "../services/rideSocketService.js";
 
-const stripeSecret = process.env.STRIPE_SECRET_KEY || "";
-const stripe = new Stripe(stripeSecret, { apiVersion: "2024-06-20" });
+/** Lazy Stripe client — empty STRIPE_SECRET_KEY must not crash boot (Render without keys). */
+function stripeSecretKey() {
+  return String(process.env.STRIPE_SECRET_KEY || "").trim();
+}
+
+let _stripe = null;
+function getStripe() {
+  const secret = stripeSecretKey();
+  if (!secret || !secret.startsWith("sk_")) {
+    throw new PaymentError("SVR_003", null, "stripe_not_configured");
+  }
+  if (!_stripe) {
+    _stripe = new Stripe(secret, { apiVersion: "2024-06-20" });
+  }
+  return _stripe;
+}
 
 export class PaymentActionError extends Error {
   constructor(code, message, httpStatus = 400) {
@@ -31,7 +45,8 @@ function minimumChargeUnits(currency) {
 }
 
 function assertStripeConfigured() {
-  if (!stripeSecret || !stripeSecret.startsWith("sk_")) {
+  const secret = stripeSecretKey();
+  if (!secret || !secret.startsWith("sk_")) {
     throw new PaymentError("SVR_003", null, "stripe_not_configured");
   }
 }
@@ -111,7 +126,7 @@ export async function createRidePaymentIntent(customerId, rideId) {
   }
 
   try {
-    const pi = await stripe.paymentIntents.create(piParams);
+    const pi = await getStripe().paymentIntents.create(piParams);
     db.prepare("UPDATE rides SET stripe_payment_intent_id=? WHERE id=?").run(pi.id, rideId);
     db.prepare(
       "INSERT INTO ride_events (ride_id, type, message) VALUES (?, 'stripe_pi_created', ?)"
@@ -147,7 +162,7 @@ export async function createCheckoutSession(customerId, rideId, { successUrl, ca
   const currency = stripeCurrency();
 
   try {
-    const session = await stripe.checkout.sessions.create({
+    const session = await getStripe().checkout.sessions.create({
       mode: "payment",
       success_url: successUrl,
       cancel_url: cancelUrl,
@@ -332,9 +347,9 @@ export async function capturePayment(paymentIntentId, rideId, actorUserId, { io 
 
   assertStripeConfigured();
   try {
-    const pi = await stripe.paymentIntents.retrieve(paymentIntentId);
+    const pi = await getStripe().paymentIntents.retrieve(paymentIntentId);
     if (pi.status === "requires_capture") {
-      await stripe.paymentIntents.capture(paymentIntentId);
+      await getStripe().paymentIntents.capture(paymentIntentId);
     }
     if (!["succeeded", "requires_capture"].includes(pi.status) && pi.status !== "processing") {
       throw new PaymentActionError("payment_init_failed", `Payment status: ${pi.status}`, 400);
@@ -366,7 +381,7 @@ export async function refundRidePayment(rideId, { amountCents = null, reason = n
   if (ride.stripe_payment_intent_id?.startsWith("pi_")) {
     assertStripeConfigured();
     try {
-      await stripe.refunds.create({
+      await getStripe().refunds.create({
         payment_intent: ride.stripe_payment_intent_id,
         amount: amountCents ? Math.round(amountCents) : undefined,
         reason: "requested_by_customer",
@@ -440,4 +455,4 @@ export function requestWithdrawal(driverUserId, { amount, method, account_detail
   };
 }
 
-export { stripe, stripeCurrency, assertStripeConfigured };
+export { getStripe as stripe, getStripe, stripeCurrency, assertStripeConfigured };
