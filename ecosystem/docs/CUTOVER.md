@@ -1,35 +1,80 @@
-# Cutover checklist — My Ride SA ecosystem → live
+# Cutover checklist — My Ride SA → live (A + B + C)
 
-**Version target:** `0.2.0`  
-**Primary hub (local):** http://127.0.0.1:8000/
+**Ecosystem version:** `0.2.1` · **Legacy web:** `1.0.3`  
+**Repo:** https://github.com/Taipan-LGM/My-Ride  
 
-Use this before pointing real Stripe / Twilio / public DNS at the API.
+This is the single go-live checklist covering:
 
-## 0. Preflight
+| Track | Doc |
+|-------|-----|
+| **A)** Legacy Render env | [docs/RENDER_LEGACY.md](../../docs/RENDER_LEGACY.md) |
+| **B)** FastAPI on Render/Docker | [RENDER_ECOSYSTEM.md](./RENDER_ECOSYSTEM.md) |
+| **C)** This cutover | below |
 
-- [ ] `make test` green
-- [ ] `make smoke` green against a running API
-- [ ] `ENVIRONMENT=production` startup fails with weak JWT / `DEBUG=true` / `CORS_ORIGINS=*` (expected)
-- [ ] `.env.prod` created from `backend/.env.prod.example` (never commit)
+**Local hub (dev):** http://127.0.0.1:8000/
 
-## 1. Data plane
+---
 
-- [ ] Postgres initialized (`database/init.sql`)
-- [ ] `DATABASE_URL` set
-- [ ] `USE_POSTGRES_PRIMARY=true` after dual-write soak
-- [ ] Redis healthy (compose prod stack)
-- [ ] Demo accounts rotated / disabled for public traffic
+## Phase A — Legacy Render green
 
-## 2. Secrets & config
+Service: `my-ride` (Node)
+
+- [ ] Deploy from `master` succeeds (`/api/health` 200)
+- [ ] Disk + `SQLITE_PATH=/var/data/myride.sqlite`
+- [ ] `JWT_SECRET` set (not empty)
+- [ ] `EXTRA_APP_ORIGINS` includes production URL
+- [ ] Stripe keys optional for boot; set before card payments
+- [ ] SPA login + cash ride smoke OK
+- [ ] Full checklist: [RENDER_LEGACY.md](../../docs/RENDER_LEGACY.md)
+
+---
+
+## Phase B — Ecosystem API live
+
+Service: `my-ride-ecosystem` (Docker) **or** `make up-prod` on a VPS
+
+### B0. Preflight (local)
+
+- [ ] `cd ecosystem && make test` green
+- [ ] `make smoke` green against local API
+- [ ] Confirm prod guards: weak JWT / `DEBUG=true` / `CORS_ORIGINS=*` fail when `ENVIRONMENT=production`
+
+### B1. Provision
+
+- [ ] Apply root `render.yaml` Blueprint **or** compose prod stack
+- [ ] Postgres `myride-pg` linked → `DATABASE_URL`
+- [ ] Redis `myride-redis` linked → `REDIS_URL`
+- [ ] Run schema: `psql "$DATABASE_URL" -f ecosystem/backend/database/init.sql`
+
+### B2. Secrets (Dashboard / `.env.prod`)
 
 - [ ] `JWT_SECRET` long random (not `my-ride-sa-dev-*`)
-- [ ] `CORS_ORIGINS` exact app origins (no `*`)
-- [ ] `PUBLIC_BASE_URL=https://api.…` (Twilio signs this URL)
-- [ ] `STRIPE_LIVE_SECRET_KEY` + `STRIPE_WEBHOOK_SECRET`
-- [ ] Twilio SID / auth token / SA numbers
-- [ ] OpenAI key only if leaving heuristic mode
+- [ ] `CORS_ORIGINS` = exact hub URL(s), **no `*`**
+- [ ] `PUBLIC_BASE_URL=https://…` (same host Twilio will call)
+- [ ] `ENVIRONMENT=production` · `DEBUG=false`
+- [ ] `USE_POSTGRES_PRIMARY=false` until soak; then `true`
+- [ ] Stripe live: `STRIPE_LIVE_SECRET_KEY` + `STRIPE_WEBHOOK_SECRET`
+- [ ] Twilio SID / auth / SA numbers
+- [ ] OpenAI only if leaving heuristic mode
 
-## 3. Webhooks (fail-closed)
+### B3. Smoke
+
+```bash
+HOST=https://my-ride-ecosystem.onrender.com   # or your domain
+curl -sS "$HOST/health"
+curl -sS -o /dev/null -w "%{http_code}\n" "$HOST/"
+```
+
+- [ ] `/health` 200 · hub `/` loads
+- [ ] Demo login works on **staging only**
+
+Details: [RENDER_ECOSYSTEM.md](./RENDER_ECOSYSTEM.md)
+
+---
+
+## Phase C — Channels, clients, go/no-go
+
+### C1. Webhooks (fail-closed)
 
 | Provider | URL | Verify |
 |----------|-----|--------|
@@ -38,40 +83,61 @@ Use this before pointing real Stripe / Twilio / public DNS at the API.
 | SMS | `POST /webhooks/sms` | same |
 | Voice | `POST /voice/incoming`, `/voice/gather` | same |
 
-- [ ] Stripe dashboard webhook endpoint → live URL
-- [ ] Twilio webhook URLs → same host as `PUBLIC_BASE_URL`
-- [ ] Unsigned Stripe rejected in production (503/400)
+- [ ] Stripe dashboard → ecosystem `PUBLIC_BASE_URL`
+- [ ] Twilio voice/SMS/WA → same host
+- [ ] Unsigned Stripe rejected in production
 - [ ] Bad Twilio signature → 403
 
-## 4. Deploy
+### C2. Clients
 
-```bash
-cd "/home/taipan/Documents/My Ride/ecosystem/backend"
-cp .env.prod.example .env.prod   # edit secrets
-docker compose --env-file .env.prod -f docker-compose.prod.yml up -d --build
-curl -sS https://api.yourdomain.co.za/health
-```
+- [ ] Flutter: `--dart-define=API_BASE_URL=https://<ecosystem-host>`
+- [ ] Hub brand at ecosystem `/`
+- [ ] SOS dials **112** (SA)
+- [ ] Refund auto-cap **R500** still enforced in code paths
 
-Optional K8s sketch: [DEPLOY_K8S.md](./DEPLOY_K8S.md)
+### C3. Go / no-go
 
-## 5. Clients
+- [ ] Book ride (hub + Flutter)
+- [ ] Payment hold/capture (Stripe)
+- [ ] One live WhatsApp / SMS / voice message each (if Twilio live)
+- [ ] Admin metrics only with admin JWT
+- [ ] Rate limit does not starve hub
+- [ ] Demo accounts **rotated or disabled** before public traffic
+- [ ] `USE_POSTGRES_PRIMARY=true` after dual-write soak
 
-- [ ] Flutter Rider/Driver: `--dart-define=API_BASE_URL=https://api…`
-- [ ] Hub brand assets served from API `/`
-- [ ] Emergency SOS still dials **112** (SA)
+### C4. Traffic split (until full cutover)
 
-## 6. Go / no-go
+| Audience | URL |
+|----------|-----|
+| Legacy SPA / existing Render users | `my-ride` service |
+| AI hub + Flutter Path A | `my-ride-ecosystem` |
 
-- [ ] Book ride (hub + app)
-- [ ] Payment hold/capture (Stripe live test amount)
-- [ ] Refund auto-cap **R500** still enforced
-- [ ] WhatsApp / SMS / voice one live message each
-- [ ] Admin metrics with admin JWT only
-- [ ] Rate limit does not starve hub after failed admin poll
+Do **not** point Flutter at the legacy Node host.
+
+---
 
 ## Rollback
 
-1. Scale API to previous image / git tag  
-2. Set `USE_POSTGRES_PRIMARY=false` if trip reads fail  
-3. Disable Stripe live webhook in dashboard  
-4. Keep Redis/Postgres volumes (`*_prod`) until confirmed
+1. Render → previous deploy / git tag for the failing service  
+2. `USE_POSTGRES_PRIMARY=false` if trip reads fail  
+3. Disable Stripe/Twilio webhooks in provider dashboards  
+4. Keep Postgres/Redis (Render) or compose volumes (`*_prod`)  
+
+---
+
+## Quick command index
+
+```bash
+# Legacy local check
+npm run deploy:check
+
+# Ecosystem tests / smoke
+cd "/home/taipan/Documents/My Ride/ecosystem"
+make test
+make api    # terminal 1
+make smoke  # terminal 2
+
+# Compose prod-like
+cd backend && cp .env.prod.example .env.prod   # edit
+make -C .. up-prod
+```

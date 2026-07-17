@@ -78,7 +78,9 @@ ecosystem/
 - Complete ride → auto payment reconciliation
 - Role JWT on money + ride mutations; Postgres dual-write when `DATABASE_URL` set
 
-See [docs/ARCHITECTURE.md](./docs/ARCHITECTURE.md), [docs/PRODUCTION.md](./docs/PRODUCTION.md), and [docs/CUTOVER.md](./docs/CUTOVER.md).
+See [docs/ARCHITECTURE.md](./docs/ARCHITECTURE.md), [docs/PRODUCTION.md](./docs/PRODUCTION.md), [docs/CUTOVER.md](./docs/CUTOVER.md), and [docs/RENDER_ECOSYSTEM.md](./docs/RENDER_ECOSYSTEM.md).
+
+Legacy Render (Node): [../docs/RENDER_LEGACY.md](../docs/RENDER_LEGACY.md) · root `render.yaml` (dual-stack).
 
 **Version:** `0.2.0` (API `app.__version__`)
 

@@ -1,8 +1,9 @@
 from __future__ import annotations
 
+import os
 from functools import lru_cache
 
-from pydantic import Field
+from pydantic import Field, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -63,6 +64,21 @@ class Settings(BaseSettings):
     # the source of truth for trips (Part 11).
     database_url: str = ""
     use_postgres_primary: bool = False
+
+    @model_validator(mode="after")
+    def _derive_public_urls_for_paas(self) -> Settings:
+        """Render injects RENDER_EXTERNAL_URL — use it so prod boot works before manual CORS."""
+        if self.environment != "production":
+            return self
+        render_url = (os.environ.get("RENDER_EXTERNAL_URL") or "").strip().rstrip("/")
+        pub = (self.public_base_url or "").strip().rstrip("/")
+        # Prefer HTTPS Render URL over localhost / empty defaults from .env.example
+        if render_url.startswith("https://") and not pub.startswith("https://"):
+            object.__setattr__(self, "public_base_url", render_url)
+            pub = render_url
+        if self.cors_origins.strip() in ("", "*") and pub.startswith("https://"):
+            object.__setattr__(self, "cors_origins", pub)
+        return self
 
 
 @lru_cache

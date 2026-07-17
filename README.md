@@ -26,7 +26,15 @@ npm run dev
 
 App runs on `http://localhost:3000`.
 
-## Deploy to Render (quick checklist)
+## Deploy to Render
+
+**Full checklists (A / B / C):**
+- Legacy Node env → [docs/RENDER_LEGACY.md](./docs/RENDER_LEGACY.md)
+- Path A FastAPI → [ecosystem/docs/RENDER_ECOSYSTEM.md](./ecosystem/docs/RENDER_ECOSYSTEM.md)
+- Go-live cutover → [ecosystem/docs/CUTOVER.md](./ecosystem/docs/CUTOVER.md)
+- Blueprint → root [`render.yaml`](./render.yaml) (`my-ride` + `my-ride-ecosystem` + Postgres + Redis)
+
+### Quick checklist (legacy Node)
 
 ### Service type
 - Use a **Web Service** running Node.js.

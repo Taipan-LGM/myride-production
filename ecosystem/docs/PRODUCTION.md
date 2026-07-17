@@ -80,7 +80,8 @@ docker compose --env-file .env.prod -f docker-compose.prod.yml up -d --build
 
 ## Cutover
 
-Full checklist: **[CUTOVER.md](./CUTOVER.md)** (webhooks, secrets, go/no-go, rollback).
+Full checklist: **[CUTOVER.md](./CUTOVER.md)** (Phases A–C: legacy Render, FastAPI deploy, webhooks/go-no-go).  
+Render FastAPI: **[RENDER_ECOSYSTEM.md](./RENDER_ECOSYSTEM.md)**.
 
 1. Point Flutter `--dart-define=API_BASE_URL=https://api...` (leave `LEGACY_BACKEND` unset/false).
 2. Configure Stripe webhooks → `/webhooks/stripe` (signature required in production).
