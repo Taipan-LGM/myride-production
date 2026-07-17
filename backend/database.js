@@ -2,6 +2,7 @@ import fs from "fs";
 import path from "path";
 import Database from "better-sqlite3";
 import dotenv from "dotenv";
+import { migrateDriverProfilesRtree } from "./database/rtree.js";
 
 dotenv.config();
 
@@ -224,11 +225,146 @@ function migrate() {
   if (hasColumn("app_settings", "city") === false) {
     db.exec("ALTER TABLE app_settings ADD COLUMN city TEXT");
   }
+  if (hasColumn("app_settings", "geocode_za_only") === false) {
+    db.exec(
+      "ALTER TABLE app_settings ADD COLUMN geocode_za_only INTEGER NOT NULL DEFAULT 0 CHECK (geocode_za_only IN (0,1))"
+    );
+  }
 
   db.exec(`
     INSERT OR IGNORE INTO app_settings (id, country, currency)
     VALUES (1, 'ZA', 'ZAR');
   `);
+
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS failed_address_attempts (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      user_input TEXT NOT NULL DEFAULT '',
+      google_prediction TEXT NOT NULL DEFAULT '',
+      missing_reason TEXT NOT NULL DEFAULT 'street_number',
+      timestamp INTEGER NOT NULL
+    );
+  `);
+  db.exec(
+    "CREATE INDEX IF NOT EXISTS idx_failed_address_attempts_ts ON failed_address_attempts(timestamp)"
+  );
+
+  if (hasColumn("app_settings", "rand_per_km") === false) {
+    db.exec(
+      "ALTER TABLE app_settings ADD COLUMN rand_per_km REAL NOT NULL DEFAULT 12"
+    );
+  }
+  if (hasColumn("app_settings", "address_suggest_debounce_ms") === false) {
+    db.exec(
+      "ALTER TABLE app_settings ADD COLUMN address_suggest_debounce_ms INTEGER NOT NULL DEFAULT 55"
+    );
+  }
+  if (hasColumn("app_settings", "fare_distance_source") === false) {
+    db.exec(
+      "ALTER TABLE app_settings ADD COLUMN fare_distance_source TEXT NOT NULL DEFAULT 'osrm'"
+    );
+  }
+  if (hasColumn("app_settings", "carttrack_api_base_url") === false) {
+    db.exec("ALTER TABLE app_settings ADD COLUMN carttrack_api_base_url TEXT");
+  }
+  if (hasColumn("rides", "distance_km") === false) {
+    db.exec("ALTER TABLE rides ADD COLUMN distance_km REAL");
+  }
+  if (hasColumn("rides", "payment_method") === false) {
+    db.exec(
+      "ALTER TABLE rides ADD COLUMN payment_method TEXT NOT NULL DEFAULT 'cash' CHECK (payment_method IN ('cash','card'))"
+    );
+  }
+
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS driver_shifts (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      driver_user_id INTEGER NOT NULL,
+      started_at TEXT NOT NULL DEFAULT (datetime('now')),
+      ended_at TEXT,
+      total_km REAL NOT NULL DEFAULT 0,
+      total_cash_fare_cents INTEGER NOT NULL DEFAULT 0,
+      FOREIGN KEY (driver_user_id) REFERENCES users(id) ON DELETE CASCADE
+    );
+  `);
+  db.exec(
+    "CREATE INDEX IF NOT EXISTS idx_driver_shifts_driver ON driver_shifts(driver_user_id)"
+  );
+
+  // INF-001: performance indexes for nearby drivers + active ride lookups
+  db.exec(
+    "CREATE INDEX IF NOT EXISTS idx_dp_online_loc ON driver_profiles(online, lat, lng) WHERE online = 1"
+  );
+  db.exec(
+    "CREATE INDEX IF NOT EXISTS idx_rides_driver_status ON rides(driver_id, status)"
+  );
+  db.exec(
+    "CREATE INDEX IF NOT EXISTS idx_rides_customer_status ON rides(customer_id, status)"
+  );
+  db.exec(
+    "CREATE INDEX IF NOT EXISTS idx_driver_locations_driver_time ON driver_locations(driver_user_id, created_at DESC)"
+  );
+
+  migrateDriverProfilesRtree();
+
+  migrateStaffRolesAndChallenges();
+}
+
+const OFFICE_ROLE_CHECK =
+  "role IN ('customer','driver','admin','operator','supervisor','manager')";
+
+function migrateStaffRolesAndChallenges() {
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS staff_login_challenges (
+      id                 INTEGER PRIMARY KEY AUTOINCREMENT,
+      external_source    TEXT NOT NULL,
+      external_staff_id  TEXT NOT NULL,
+      challenge_code     TEXT NOT NULL,
+      status             TEXT NOT NULL DEFAULT 'pending' CHECK (status IN ('pending','confirmed','used','expired')),
+      expires_at         TEXT NOT NULL,
+      created_at         TEXT NOT NULL DEFAULT (datetime('now'))
+    );
+  `);
+  db.exec(
+    "CREATE INDEX IF NOT EXISTS idx_staff_login_challenges_status ON staff_login_challenges(status)"
+  );
+
+  const usersSql = tableSql("users");
+  if (usersSql.includes("operator")) return;
+
+  const fkWasOn = db.pragma("foreign_keys", { simple: true });
+  db.pragma("foreign_keys = OFF");
+
+  try {
+    db.transaction(() => {
+      db.exec(`
+      CREATE TABLE users_role_migrate (
+        id                INTEGER PRIMARY KEY AUTOINCREMENT,
+        role              TEXT NOT NULL CHECK (${OFFICE_ROLE_CHECK}),
+        external_source   TEXT,
+        external_id       TEXT,
+        email             TEXT NOT NULL UNIQUE,
+        password_hash     TEXT NOT NULL,
+        name              TEXT NOT NULL,
+        created_at        TEXT NOT NULL DEFAULT (datetime('now'))
+      );
+    `);
+      db.exec(`
+      INSERT INTO users_role_migrate (
+        id, role, external_source, external_id, email, password_hash, name, created_at
+      )
+      SELECT id, role, external_source, external_id, email, password_hash, name, created_at
+      FROM users;
+    `);
+      db.exec("DROP TABLE users;");
+      db.exec("ALTER TABLE users_role_migrate RENAME TO users;");
+      db.exec(
+        "CREATE UNIQUE INDEX IF NOT EXISTS idx_users_external ON users(external_source, external_id)"
+      );
+    })();
+  } finally {
+    if (fkWasOn) db.pragma("foreign_keys = ON");
+  }
 }
 
 export function initDatabase(schemaSql) {

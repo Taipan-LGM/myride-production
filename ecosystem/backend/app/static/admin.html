@@ -1,0 +1,89 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>My Ride SA — AI Ops</title>
+  <link rel="icon" href="/static/brand/my_ride_logo.png" />
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;600;700&family=Barlow+Condensed:wght@700&display=swap" rel="stylesheet" />
+  <style>
+    :root { --yellow:#FDB813; --ink:#333; --muted:#6b6b6b; --line:#e6e6e6; }
+    body { margin:0; font-family:"DM Sans",system-ui,sans-serif; color:var(--ink); background:#fafafa; }
+    header { padding:1.2rem 1.5rem; background:#fff; border-bottom:1px solid var(--line); display:flex; justify-content:space-between; align-items:center; gap:1rem; flex-wrap:wrap; }
+    .logo { height:48px; border-radius:12px; }
+    h1 { margin:0; font-family:"Barlow Condensed",sans-serif; font-size:1.8rem; }
+    .live { color:var(--yellow); font-weight:700; font-size:.9rem; }
+    main { padding:1.2rem 1.5rem; display:grid; gap:.8rem; grid-template-columns:repeat(auto-fit,minmax(150px,1fr)); }
+    .card { background:#fff; border:1px solid var(--line); border-radius:14px; padding:1rem; }
+    .label { color:var(--muted); font-size:.72rem; text-transform:uppercase; letter-spacing:.06em; }
+    .value { font-size:1.7rem; font-weight:700; margin-top:.25rem; }
+    .wide { grid-column:1/-1; }
+    pre { margin:.5rem 0 0; background:#111; color:#d9f5c8; border-radius:10px; padding:1rem; overflow:auto; max-height:340px; font-size:.8rem; }
+    a { color:var(--ink); }
+    .btn { border:1px solid var(--line); background:var(--yellow); border-radius:999px; padding:.55rem 1rem; font:inherit; font-weight:600; cursor:pointer; }
+  </style>
+</head>
+<body>
+  <header>
+    <div style="display:flex;align-items:center;gap:.8rem">
+      <img class="logo" src="/static/brand/my_ride_logo.png" alt="My Ride" />
+      <div>
+        <h1>AI Ops</h1>
+        <div style="color:var(--muted);font-size:.9rem">…Your Urban Ride, Simplified.</div>
+      </div>
+    </div>
+    <div class="live">LIVE <span id="ts"></span> · <a href="/">Hub login</a></div>
+  </header>
+  <main>
+    <div class="card"><div class="label">Live rides</div><div class="value" id="live_rides">—</div></div>
+    <div class="card"><div class="label">Active drivers</div><div class="value" id="active_drivers">—</div></div>
+    <div class="card"><div class="label">AI resolution</div><div class="value" id="ai_resolution">—</div></div>
+    <div class="card"><div class="label">Revenue</div><div class="value" id="revenue">—</div></div>
+    <div class="card wide"><div class="label">Raw metrics</div><pre id="raw">Loading…</pre>
+      <p id="ops-hint" style="color:var(--muted);font-size:.85rem"></p>
+      <button type="button" class="btn" id="btn-ops-refresh">Refresh</button>
+    </div>
+  </main>
+  <script>
+    let timer = null;
+    let paused = false;
+    async function refresh() {
+      if (paused) return;
+      const token = (() => { try { return JSON.parse(localStorage.getItem('myride_session_v1')||'{}').token; } catch { return null; } })();
+      const role = (() => { try { return JSON.parse(localStorage.getItem('myride_session_v1')||'{}').user?.role; } catch { return null; } })();
+      if (!token || role !== 'admin') {
+        paused = true;
+        document.getElementById('raw').textContent = 'Sign in as admin on the hub (/), then reopen this page.';
+        document.getElementById('ops-hint').textContent = 'Polling paused — no admin session.';
+        if (timer) { clearInterval(timer); timer = null; }
+        return;
+      }
+      const res = await fetch('/admin/metrics', { headers: { Authorization: 'Bearer ' + token } });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        document.getElementById('raw').textContent = data.detail || 'Login as admin at /';
+        if (res.status === 401 || res.status === 403) {
+          paused = true;
+          if (timer) { clearInterval(timer); timer = null; }
+          document.getElementById('ops-hint').textContent = 'Polling paused after auth error.';
+        }
+        return;
+      }
+      document.getElementById('live_rides').textContent = data.live_rides;
+      document.getElementById('active_drivers').textContent = data.active_drivers;
+      document.getElementById('ai_resolution').textContent = data.ai_resolution_rate + '%';
+      document.getElementById('revenue').textContent = 'R' + (data.revenue_today_zar||0).toFixed(2);
+      document.getElementById('ts').textContent = new Date(data.generated_at).toLocaleTimeString();
+      document.getElementById('raw').textContent = JSON.stringify(data, null, 2);
+      document.getElementById('ops-hint').textContent = '';
+    }
+    document.getElementById('btn-ops-refresh').addEventListener('click', () => {
+      paused = false;
+      refresh();
+      if (!timer) timer = setInterval(refresh, 8000);
+    });
+    refresh();
+    timer = setInterval(refresh, 8000);
+  </script>
+</body>
+</html>

@@ -10,19 +10,24 @@ import { Server as SocketIOServer } from "socket.io";
 import dotenv from "dotenv";
 
 import { securityHeadersMiddleware } from "./securityHeaders.js";
-import { initDatabase, db } from "./database.js";
+import { initDatabase } from "./database.js";
 import { ensureAdminBootstrap, socketAuthMiddleware, authRequired, roleRequired } from "./auth.js";
+import { attachSocketHandlers } from "./socket/index.js";
 
 import usersRouter from "./routes/users.js";
 import ridesRouter from "./routes/rides.js";
+import driversRouter from "./routes/drivers.js";
 import paymentsRouter from "./routes/payments.js";
 import adminRouter from "./routes/admin.js";
 import applicationsRouter from "./routes/applications.js";
 import driverAuthRouter from "./routes/driverAuth.js";
+import staffAuthRouter from "./routes/staffAuth.js";
+import adminAuthRouter from "./routes/adminAuth.js";
 import geocodeRouter from "./routes/geocode.js";
 import settingsRouter from "./routes/settings.js";
 import platformSettingsRouter from "./routes/platformSettings.js";
 import payoutsRouter from "./routes/payouts.js";
+import { errorHandler } from "./middleware/errorHandler.js";
 import { createRidePaymentIntent } from "./services/ridePaymentIntent.js";
 
 dotenv.config();
@@ -66,7 +71,24 @@ const ALLOWED_ORIGINS = parseOrigins();
 
 function originAllowed(origin) {
   if (!origin) return true; // non-browser clients
-  return ALLOWED_ORIGINS.includes(origin);
+  if (ALLOWED_ORIGINS.includes(origin)) return true;
+  // Phone-on-LAN testing: allow private IPs when not in APP_ORIGINS (dev only).
+  if (process.env.NODE_ENV !== "production") {
+    try {
+      const { hostname } = new URL(origin);
+      if (hostname === "localhost" || hostname === "127.0.0.1") return true;
+      if (/^192\.168\.\d{1,3}\.\d{1,3}$/.test(hostname)) return true;
+      if (/^10\.\d{1,3}\.\d{1,3}\.\d{1,3}$/.test(hostname)) return true;
+      if (
+        /^172\.(1[6-9]|2\d|3[01])\.\d{1,3}\.\d{1,3}$/.test(hostname)
+      ) {
+        return true;
+      }
+    } catch {
+      /* ignore */
+    }
+  }
+  return false;
 }
 
 function guessLanIpv4() {
@@ -163,14 +185,20 @@ app.post(
 
 app.use("/api/users", usersRouter);
 app.use("/api/rides", ridesRouter);
+app.use("/api/drivers", driversRouter);
 app.use("/api/payments", paymentsRouter);
 app.use("/api/admin", adminRouter);
 app.use("/api/applications", applicationsRouter);
 app.use("/api/driver-auth", driverAuthRouter);
+app.use("/api/staff-auth", staffAuthRouter);
+app.use("/api/admin-auth", adminAuthRouter);
 app.use("/api/geocode", geocodeRouter);
 app.use("/api/settings", settingsRouter);
 app.use("/api/platform-settings", platformSettingsRouter);
 app.use("/api/payouts", payoutsRouter);
+
+// API error handler (before static frontend catch-all)
+app.use(errorHandler);
 
 // Serve static logos (repo root /Logos) at /logos/...
 app.use("/logos", express.static(path.resolve(process.cwd(), "Logos")));
@@ -183,47 +211,8 @@ app.get("*", (_req, res) => {
 });
 
 io.use(socketAuthMiddleware);
-
-io.on("connection", (socket) => {
-  const { user } = socket.data;
-  if (!user) return;
-
-  socket.join(`user:${user.id}`);
-  socket.join(`role:${user.role}`);
-  if (user.role === "driver") socket.join(`driver:${user.id}`);
-  if (user.role === "customer") socket.join(`customer:${user.id}`);
-  if (user.role === "admin") socket.join("admin");
-
-  socket.emit("hello", {
-    user: { id: user.id, role: user.role, email: user.email, name: user.name },
-  });
-
-  socket.on("driver:setOnline", (payload) => {
-    if (user.role !== "driver") return;
-    const online = payload?.online ? 1 : 0;
-    db.prepare(
-      "UPDATE driver_profiles SET online=?, updated_at=datetime('now') WHERE user_id=?"
-    ).run(online, user.id);
-    socket.emit("driver:onlineStatus", { online: Boolean(online) });
-  });
-
-  socket.on("driver:updateLocation", (payload) => {
-    if (user.role !== "driver") return;
-    const lat = Number(payload?.lat);
-    const lng = Number(payload?.lng);
-    if (!Number.isFinite(lat) || !Number.isFinite(lng)) return;
-
-    db.prepare(
-      "UPDATE driver_profiles SET lat=?, lng=?, updated_at=datetime('now') WHERE user_id=?"
-    ).run(lat, lng, user.id);
-
-    db.prepare(
-      "INSERT INTO driver_locations (driver_user_id, ride_id, lat, lng) VALUES (?, NULL, ?, ?)"
-    ).run(user.id, lat, lng);
-
-    io.to(`driver:${user.id}`).emit("driver:locationUpdated", { lat, lng });
-  });
-});
+const socketRuntime = attachSocketHandlers(io);
+app.locals.locationService = socketRuntime.locationService;
 
 function assertProductionConfig() {
   if (NODE_ENV !== "production") return;

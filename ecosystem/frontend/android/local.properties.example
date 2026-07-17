@@ -1,0 +1,7 @@
+# Android local config (not committed). Copy from example:
+#   cp local.properties.example local.properties
+#
+# flutter.sdk is set automatically by Flutter; add your Maps key:
+
+flutter.sdk=/path/to/flutter
+GOOGLE_MAPS_API_KEY=YOUR_ANDROID_KEY

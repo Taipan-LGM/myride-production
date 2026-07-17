@@ -116,6 +116,13 @@ router.post("/login", authRouteLimiter, (req, res) => {
   if (!verifyPassword(password, user.password_hash)) {
     return res.status(401).json({ error: "invalid_credentials" });
   }
+  if (user.role !== "customer") {
+    return res.status(403).json({
+      error: "use_role_login",
+      message:
+        "Drivers and staff must sign in with their QR card. Admins use the Admin PIN login.",
+    });
+  }
 
   const token = signToken(user);
   return res.json({

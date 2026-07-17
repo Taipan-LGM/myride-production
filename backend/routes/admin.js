@@ -1,12 +1,28 @@
 import express from "express";
 import { z } from "zod";
 import { db } from "../database.js";
-import { authRequired, roleRequired } from "../auth.js";
+import { authRequired, roleRequired, hashPassword } from "../auth.js";
 import { externalDriverIdSchema } from "../utils/logicline.js";
+import {
+  externalStaffIdSchema,
+  generateStaffExternalId,
+  staffQrPayload,
+  STAFF_ROLES,
+  OFFICE_ROLES,
+} from "../utils/staffQr.js";
 
 const router = express.Router();
+const STAFF_EXTERNAL_SOURCE = "myride_staff";
 
-router.use(authRequired, roleRequired("admin"));
+router.use(authRequired);
+router.use((req, res, next) => {
+  if (!OFFICE_ROLES.includes(req.user.role)) {
+    return res.status(403).json({ error: "forbidden" });
+  }
+  next();
+});
+
+const adminOnly = roleRequired("admin");
 
 router.get("/users", (_req, res) => {
   const users = db
@@ -37,7 +53,7 @@ const approveSchema = z.object({
   status: z.enum(["approved", "rejected"]),
 });
 
-router.post("/drivers/:id/approval", (req, res) => {
+router.post("/drivers/:id/approval", adminOnly, (req, res) => {
   const driverId = Number(req.params.id);
   if (!Number.isFinite(driverId)) {
     return res.status(400).json({ error: "invalid_driver_id" });
@@ -141,7 +157,7 @@ router.get("/analytics", (_req, res) => {
   res.json({ totals, ridesPerDay, revenuePerDay });
 });
 
-router.post("/seed-drivers", (_req, res) => {
+router.post("/seed-drivers", adminOnly, (_req, res) => {
   const cityLat = 40.7128;
   const cityLng = -74.006;
   const vehicleTypes = ["Car", "MPV"];
@@ -196,7 +212,7 @@ const applicationStatusSchema = z.object({
   status: z.enum(["new", "reviewed", "approved", "rejected"]),
 });
 
-router.patch("/applications/:id/status", (req, res) => {
+router.patch("/applications/:id/status", adminOnly, (req, res) => {
   const applicationId = Number(req.params.id);
   if (!Number.isFinite(applicationId)) {
     return res.status(400).json({ error: "invalid_application_id" });
@@ -230,7 +246,7 @@ const logiclineConfirmSchema = z.object({
   external_driver_id: externalDriverIdSchema,
 });
 
-router.post("/logicline/confirm-challenge", (req, res) => {
+router.post("/logicline/confirm-challenge", adminOnly, (req, res) => {
   const parsed = logiclineConfirmSchema.safeParse(req.body);
   if (!parsed.success) {
     return res
@@ -268,6 +284,110 @@ router.post("/logicline/confirm-challenge", (req, res) => {
 
   db.prepare("UPDATE driver_login_challenges SET status='confirmed' WHERE id=?").run(row.id);
   return res.json({ ok: true });
+});
+
+// --- My Ride staff QR login cards (office staff; separate from driver Logicline QR) ---
+const staffConfirmSchema = z.object({
+  challenge_id: z.number().int().positive(),
+  external_staff_id: externalStaffIdSchema,
+});
+
+router.post("/staff-auth/confirm-challenge", adminOnly, (req, res) => {
+  const parsed = staffConfirmSchema.safeParse(req.body);
+  if (!parsed.success) {
+    return res
+      .status(400)
+      .json({ error: "invalid_input", details: parsed.error.flatten() });
+  }
+
+  const { challenge_id, external_staff_id } = parsed.data;
+  const row = db
+    .prepare(
+      `
+      SELECT id, status, expires_at
+      FROM staff_login_challenges
+      WHERE id=? AND external_source=? AND external_staff_id=?
+    `
+    )
+    .get(challenge_id, STAFF_EXTERNAL_SOURCE, external_staff_id);
+
+  if (!row) return res.status(404).json({ error: "challenge_not_found" });
+
+  const expired = db
+    .prepare("SELECT datetime('now') > ? as expired")
+    .get(row.expires_at).expired;
+
+  if (expired) {
+    db.prepare("UPDATE staff_login_challenges SET status='expired' WHERE id=?").run(row.id);
+    return res.status(400).json({ error: "challenge_expired" });
+  }
+
+  if (row.status !== "pending") {
+    return res.status(400).json({ error: "invalid_challenge_status" });
+  }
+
+  db.prepare("UPDATE staff_login_challenges SET status='confirmed' WHERE id=?").run(row.id);
+  return res.json({ ok: true });
+});
+
+router.get("/staff", adminOnly, (_req, res) => {
+  const placeholders = STAFF_ROLES.map(() => "?").join(",");
+  const staff = db
+    .prepare(
+      `
+      SELECT id, role, email, name, external_id, created_at
+      FROM users
+      WHERE role IN (${placeholders}) AND external_source=?
+      ORDER BY id DESC
+    `
+    )
+    .all(...STAFF_ROLES, STAFF_EXTERNAL_SOURCE);
+  res.json({ staff });
+});
+
+const createStaffSchema = z.object({
+  name: z.string().trim().min(2).max(60),
+  role: z.enum(STAFF_ROLES),
+  email: z.string().trim().toLowerCase().email().optional(),
+});
+
+router.post("/staff", adminOnly, (req, res) => {
+  const parsed = createStaffSchema.safeParse(req.body);
+  if (!parsed.success) {
+    return res
+      .status(400)
+      .json({ error: "invalid_input", details: parsed.error.flatten() });
+  }
+
+  const { name, role } = parsed.data;
+  const external_staff_id = generateStaffExternalId(role);
+  const email =
+    parsed.data.email ||
+    `${external_staff_id.replace(/[^a-z0-9]+/gi, ".")}@staff.myride.local`.toLowerCase();
+
+  const existingEmail = db.prepare("SELECT id FROM users WHERE email=?").get(email);
+  if (existingEmail) return res.status(409).json({ error: "email_already_in_use" });
+
+  const password_hash = hashPassword(`staff-qr-${Date.now()}-${Math.random()}`);
+
+  const info = db
+    .prepare(
+      `
+      INSERT INTO users (role, external_source, external_id, email, password_hash, name)
+      VALUES (?, ?, ?, ?, ?, ?)
+    `
+    )
+    .run(role, STAFF_EXTERNAL_SOURCE, external_staff_id, email, password_hash, name);
+
+  const staff = db
+    .prepare("SELECT id, role, email, name, external_id, created_at FROM users WHERE id=?")
+    .get(Number(info.lastInsertRowid));
+
+  return res.status(201).json({
+    staff,
+    external_staff_id,
+    qr_payload: staffQrPayload(external_staff_id),
+  });
 });
 
 export default router;

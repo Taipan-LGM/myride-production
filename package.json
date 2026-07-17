@@ -6,12 +6,19 @@
   "main": "backend/server.js",
   "type": "module",
   "scripts": {
-    "postinstall": "npm rebuild better-sqlite3",
+    "postinstall": "npm rebuild better-sqlite3 --build-from-source",
+    "fix:native": "npm rebuild better-sqlite3 --build-from-source",
     "dev": "nodemon backend/server.js",
     "start": "node backend/server.js",
     "deploy:check": "node scripts/deploy-check.mjs",
     "db:init": "node scripts/sync-db.mjs",
-    "seed:drivers": "node backend/utils/mockDrivers.js"
+    "seed:drivers": "node backend/utils/mockDrivers.js",
+    "test": "node --test backend/lib/*.test.js backend/services/*.test.js backend/tests/**/*.test.js",
+    "seed:rtree": "node backend/database/scripts/seed-rtree.mjs",
+    "verify:rtree": "node backend/database/scripts/verify-rtree.mjs",
+    "migrate:rtree": "node backend/database/scripts/migrate-rtree.mjs",
+    "rtree:all": "npm run migrate:rtree && npm run seed:rtree && npm run verify:rtree",
+    "backup:db": "mkdir -p backups && cp \"${SQLITE_PATH:-./mycab.sqlite}\" \"backups/mycab_$(date +%Y%m%d_%H%M%S).sqlite\""
   },
   "engines": {
     "node": ">=20"
@@ -27,6 +34,7 @@
     "helmet": "^7.2.0",
     "jsonwebtoken": "^9.0.2",
     "morgan": "^1.10.0",
+    "qrcode": "^1.5.4",
     "socket.io": "^4.8.1",
     "stripe": "^18.2.1",
     "zod": "^4.1.3"

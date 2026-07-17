@@ -3,7 +3,7 @@ PRAGMA foreign_keys = ON;
 -- Users (all roles)
 CREATE TABLE IF NOT EXISTS users (
   id                INTEGER PRIMARY KEY AUTOINCREMENT,
-  role              TEXT NOT NULL CHECK (role IN ('customer','driver','admin')),
+  role              TEXT NOT NULL CHECK (role IN ('customer','driver','admin','operator','supervisor','manager')),
   external_source   TEXT,
   external_id       TEXT,
   email             TEXT NOT NULL UNIQUE,
@@ -154,4 +154,17 @@ CREATE TABLE IF NOT EXISTS driver_login_challenges (
 );
 
 CREATE INDEX IF NOT EXISTS idx_driver_login_challenges_status ON driver_login_challenges(status);
+
+-- Staff QR login challenges (My Ride office staff — separate from driver Logicline flow)
+CREATE TABLE IF NOT EXISTS staff_login_challenges (
+  id                 INTEGER PRIMARY KEY AUTOINCREMENT,
+  external_source    TEXT NOT NULL,
+  external_staff_id  TEXT NOT NULL,
+  challenge_code     TEXT NOT NULL,
+  status             TEXT NOT NULL DEFAULT 'pending' CHECK (status IN ('pending','confirmed','used','expired')),
+  expires_at         TEXT NOT NULL,
+  created_at         TEXT NOT NULL DEFAULT (datetime('now'))
+);
+
+CREATE INDEX IF NOT EXISTS idx_staff_login_challenges_status ON staff_login_challenges(status);
 

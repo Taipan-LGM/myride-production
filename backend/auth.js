@@ -1,6 +1,7 @@
 import jwt from "jsonwebtoken";
 import bcrypt from "bcryptjs";
 import { db } from "./database.js";
+import { AuthError } from "./errors/index.js";
 
 const JWT_SECRET = process.env.JWT_SECRET || "dev_secret_change_me";
 const JWT_EXPIRES_IN = process.env.JWT_EXPIRES_IN || "7d";
@@ -27,32 +28,35 @@ export function authRequired(req, res, next) {
     const auth = req.headers.authorization || "";
     const parts = auth.split(" ");
     if (parts.length !== 2 || parts[0] !== "Bearer") {
-      return res.status(401).json({ error: "missing_bearer_token" });
+      return next(new AuthError("AUTH_001"));
     }
     const token = parts[1];
     const decoded = jwt.verify(token, JWT_SECRET);
     const userId = Number(decoded.sub);
     if (!Number.isFinite(userId)) {
-      return res.status(401).json({ error: "invalid_token" });
+      return next(new AuthError("AUTH_002"));
     }
 
     const user = db
       .prepare("SELECT id, role, email, name, created_at FROM users WHERE id=?")
       .get(userId);
-    if (!user) return res.status(401).json({ error: "user_not_found" });
+    if (!user) return next(new AuthError("AUTH_002"));
 
     req.user = user;
     next();
-  } catch {
-    return res.status(401).json({ error: "invalid_or_expired_token" });
+  } catch (err) {
+    if (err?.name === "TokenExpiredError") {
+      return next(new AuthError("AUTH_003"));
+    }
+    return next(new AuthError("AUTH_002"));
   }
 }
 
 export function roleRequired(...roles) {
   return (req, res, next) => {
-    if (!req.user) return res.status(401).json({ error: "unauthorized" });
+    if (!req.user) return next(new AuthError("AUTH_001"));
     if (!roles.includes(req.user.role)) {
-      return res.status(403).json({ error: "forbidden" });
+      return next(new AuthError("AUTH_006"));
     }
     next();
   };
