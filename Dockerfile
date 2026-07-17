@@ -1,4 +1,4 @@
-# Dockerfile
+# Dockerfile (Files in root)
 FROM python:3.12-slim AS builder
 
 WORKDIR /build
@@ -26,7 +26,6 @@ ENV PATH="/install/bin:$PATH"
 # Copy application code
 COPY app ./app
 COPY run.py .
-COPY database ./database
 
 # Create a non-root user
 RUN useradd --create-home --uid 10001 appuser \
