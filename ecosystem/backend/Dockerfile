@@ -13,7 +13,7 @@ WORKDIR /app
 ENV PYTHONUNBUFFERED=1 \
     PYTHONDONTWRITEBYTECODE=1 \
     PYTHONPATH=/app \
-    PATH="/install/bin:$PATH"
+    
 
 COPY --from=builder /install /install
 COPY app ./app
