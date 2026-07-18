@@ -9,10 +9,17 @@ dotenv.config();
 const SQLITE_PATH = process.env.SQLITE_PATH || "./mycab.sqlite";
 
 if (!String(SQLITE_PATH).includes("memory")) {
-  fs.mkdirSync(path.dirname(path.resolve(SQLITE_PATH)), { recursive: true });
+  const dir = path.dirname(path.resolve(SQLITE_PATH));
+  // eslint-disable-next-line no-console
+  console.log(`[my-ride] ensuring sqlite dir: ${dir}`);
+  fs.mkdirSync(dir, { recursive: true });
 }
 
+// eslint-disable-next-line no-console
+console.log(`[my-ride] opening sqlite: ${SQLITE_PATH}`);
 export const db = new Database(SQLITE_PATH);
+// eslint-disable-next-line no-console
+console.log("[my-ride] sqlite open ok");
 
 db.pragma("journal_mode = WAL");
 db.pragma("foreign_keys = ON");

@@ -253,25 +253,39 @@ function logProductionStripeWarnings() {
 }
 
 async function boot() {
+  // eslint-disable-next-line no-console
+  console.log(
+    `[my-ride] boot NODE_ENV=${NODE_ENV} HOST=${HOST} PORT=${PORT} SQLITE_PATH=${process.env.SQLITE_PATH || "./mycab.sqlite"}`
+  );
   assertProductionConfig();
   logProductionStripeWarnings();
 
   const schemaPath = path.resolve(process.cwd(), "db", "schema.sql");
+  // eslint-disable-next-line no-console
+  console.log(`[my-ride] loading schema ${schemaPath}`);
   const schema = fs.readFileSync(schemaPath, "utf8");
   initDatabase(schema);
+  // eslint-disable-next-line no-console
+  console.log("[my-ride] schema/migrate ok");
 
   await ensureAdminBootstrap();
+  // eslint-disable-next-line no-console
+  console.log("[my-ride] admin bootstrap done — binding HTTP");
 
-  server.listen(PORT, HOST, () => {
-    const lan = guessLanIpv4();
-    // eslint-disable-next-line no-console
-    console.log(`My Ride listening on http://${HOST}:${PORT}`);
-    // eslint-disable-next-line no-console
-    console.log(`Open locally: http://localhost:${PORT}`);
-    if (lan) {
+  await new Promise((resolve, reject) => {
+    server.listen(PORT, HOST, () => {
+      const lan = guessLanIpv4();
       // eslint-disable-next-line no-console
-      console.log(`On your phone (same Wi‑Fi): http://${lan}:${PORT}`);
-    }
+      console.log(`My Ride listening on http://${HOST}:${PORT}`);
+      // eslint-disable-next-line no-console
+      console.log(`Open locally: http://localhost:${PORT}`);
+      if (lan) {
+        // eslint-disable-next-line no-console
+        console.log(`On your phone (same Wi‑Fi): http://${lan}:${PORT}`);
+      }
+      resolve();
+    });
+    server.on("error", reject);
   });
 }
 
