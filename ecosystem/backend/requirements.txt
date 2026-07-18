@@ -30,3 +30,4 @@ redis>=5.2.0
 
 # Env loading for local scripts
 python-dotenv>=1.0.0
+uvicorn
