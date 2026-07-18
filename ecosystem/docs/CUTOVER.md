@@ -19,13 +19,14 @@ This is the single go-live checklist covering:
 
 Service: `my-ride` (Node)
 
-- [ ] Deploy from `master` succeeds (`/api/health` 200)
+- [x] Deploy from `master` succeeds (Render reports deploy successful; confirm `/api/health` 200 from your network)
 - [ ] Disk + `SQLITE_PATH=/var/data/myride.sqlite`
-- [ ] `JWT_SECRET` set (not empty)
+- [x] `JWT_SECRET` set (≥32 chars — required for production boot)
 - [ ] `EXTRA_APP_ORIGINS` includes production URL
 - [ ] Stripe keys optional for boot; set before card payments
 - [ ] SPA login + cash ride smoke OK
 - [ ] Full checklist: [RENDER_LEGACY.md](../../docs/RENDER_LEGACY.md)
+- [ ] Public URL confirmed (paste Dashboard **URL** if not `https://my-ride.onrender.com`)
 
 ---
 
@@ -90,10 +91,27 @@ Details: [RENDER_ECOSYSTEM.md](./RENDER_ECOSYSTEM.md)
 
 ### C2. Clients
 
+```bash
+# Point Flutter at ecosystem FastAPI (NOT legacy Node)
+export API_BASE_URL=https://my-ride-ecosystem.onrender.com   # or your custom domain
+cd "/home/taipan/Documents/My Ride/ecosystem"
+./run-rider.sh
+# or: cd frontend && source scripts/dart_defines.sh && flutter run "${DART_DEFINES[@]}"
+```
+
 - [ ] Flutter: `--dart-define=API_BASE_URL=https://<ecosystem-host>`
 - [ ] Hub brand at ecosystem `/`
 - [ ] SOS dials **112** (SA)
 - [ ] Refund auto-cap **R500** still enforced in code paths
+
+### C1b. Legacy vs ecosystem Stripe webhooks
+
+| Stack | Stripe endpoint |
+|-------|-----------------|
+| Legacy Node | `https://<my-ride-host>/api/payments/webhook` |
+| Ecosystem FastAPI | `https://<ecosystem-host>/webhooks/stripe` |
+
+Twilio (ecosystem only): `/webhooks/whatsapp`, `/webhooks/sms`, `/voice/incoming`, `/voice/gather` — `PUBLIC_BASE_URL` must match.
 
 ### C3. Go / no-go
 
@@ -131,6 +149,9 @@ Do **not** point Flutter at the legacy Node host.
 # Legacy local check
 npm run deploy:check
 
+# Legacy Render smoke (health + register/login + cash ride create)
+BASE_URL=https://my-ride.onrender.com ./scripts/smoke-legacy-render.sh
+
 # Ecosystem tests / smoke
 cd "/home/taipan/Documents/My Ride/ecosystem"
 make test
@@ -140,4 +161,7 @@ make smoke  # terminal 2
 # Compose prod-like
 cd backend && cp .env.prod.example .env.prod   # edit
 make -C .. up-prod
+
+# Postgres schema (Render external DB URL from Dashboard)
+psql "$DATABASE_URL" -f ecosystem/backend/database/init.sql
 ```
