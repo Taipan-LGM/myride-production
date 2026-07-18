@@ -12,8 +12,8 @@ WORKDIR /app
 
 ENV PYTHONUNBUFFERED=1 \
     PYTHONDONTWRITEBYTECODE=1 \
-    PYTHONPATH=/app \
-    
+    PYTHONPATH=/app:/install/lib/python3.12/site-packages \
+    PATH="/install/bin:$PATH"
 
 COPY --from=builder /install /install
 COPY app ./app
