@@ -47,7 +47,7 @@ class RiderProfile(BaseModel):
 class DriverProfile(BaseModel):
     id: str
     name: str
-    phone: str
+    phone: str | None = None
     vehicle_make: str | None = None
     vehicle_model: str | None = None
     vehicle_plate: str | None = None

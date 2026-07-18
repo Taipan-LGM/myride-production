@@ -194,10 +194,12 @@ async def driver_update_availability(
     loc = body.location or GeoPoint(lat=-33.9249, lng=18.4241)
     driver = await db.get_driver(body.driver_id)
     if not driver:
+        # Cold store / missing seed — upsert minimal valid profile from JWT
         driver = await db.create_driver(
             {
                 "id": body.driver_id,
-                "name": "Driver",
+                "name": getattr(user, "name", None) or user.email or "Driver",
+                "phone": getattr(user, "phone", None) or user.email,
                 "location": loc.model_dump(),
                 "is_online": body.is_online,
             }

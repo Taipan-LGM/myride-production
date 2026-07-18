@@ -97,6 +97,8 @@ class FirestoreDB:
         payload = {
             **data,
             "id": driver_id,
+            "name": data.get("name") or "Driver",
+            "phone": data.get("phone"),
             "location": location,
             "geohash": geohash,
             "created_at": _now().isoformat(),

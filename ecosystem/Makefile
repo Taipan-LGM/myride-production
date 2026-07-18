@@ -11,6 +11,7 @@ help:
 	@echo "  make admin        - print dashboard URL"
 	@echo "  make urls         - all local URLs"
 	@echo "  make flutter-rider / flutter-driver"
+	@echo "  make flutter-rider-staging - Rider → Render Path A"
 
 dev: redis
 	@$(MAKE) -C backend run
@@ -57,6 +58,9 @@ urls:
 
 flutter-rider:
 	@./run-rider.sh
+
+flutter-rider-staging:
+	@./run-rider-staging.sh
 
 flutter-driver:
 	@./run-driver.sh

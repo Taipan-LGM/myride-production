@@ -11,7 +11,23 @@ This is the single go-live checklist covering:
 | **B)** FastAPI on Render/Docker | [RENDER_ECOSYSTEM.md](./RENDER_ECOSYSTEM.md) |
 | **C)** This cutover | below |
 
-**Local hub (dev):** http://127.0.0.1:8000/
+**Local hub (dev):** http://127.0.0.1:8000/  
+**Path A Render (verified 2026-07-18):** https://my-ride-ecosystem.onrender.com — `/health` 200 · hub `/` 200 · `/safety/emergency` → **112**
+
+### Way forward (brief Path A — keep shipping)
+
+| # | Step | Status |
+|---|------|--------|
+| 1 | Staging URL live (Render ecosystem) | Done — health/hub/112 |
+| 2 | Local PM hub + API smoke (book/SOS/channels) | Done — `scripts/smoke_test.sh` |
+| 3 | Compose/VPS prod stack | Blocked — install Docker (sudo), then `scripts/up-prod-compose.sh` |
+| 4 | Fix Render driver cold-store 500 | In progress — deploy driver-availability fix |
+| 5 | Flutter → ecosystem host (not legacy Node) | Script: `ecosystem/run-rider-staging.sh` |
+| 6 | Live Stripe/Twilio webhooks + `PUBLIC_BASE_URL` | Needs Dashboard secrets |
+| 7 | Go/no-go: book + pay + SOS + admin JWT | After 4–6 |
+| 8 | Rotate/disable demo accounts before public | Before open traffic |
+
+Brief PART 13 (K8s/RN/Elixir) **mapped to Path A:** Compose/Render instead of kubectl; Flutter instead of RN; FastAPI WS instead of Phoenix.
 
 ---
 
@@ -66,10 +82,29 @@ curl -sS "$HOST/health"
 curl -sS -o /dev/null -w "%{http_code}\n" "$HOST/"
 ```
 
-- [ ] `/health` 200 · hub `/` loads
+- [x] `/health` 200 · hub `/` loads (`https://my-ride-ecosystem.onrender.com`)
 - [ ] Demo login works on **staging only**
 
 Details: [RENDER_ECOSYSTEM.md](./RENDER_ECOSYSTEM.md)
+
+### B4. Compose / VPS (`make up-prod`)
+
+Needs Docker on host (not installed here yet — run install in a local terminal):
+
+```bash
+sudo apt-get update && sudo apt-get install -y docker.io docker-compose-v2
+sudo usermod -aG docker "$USER"
+# re-login / newgrp docker, then:
+# stop local uvicorn on :8000 if running
+cd "/home/taipan/Documents/My Ride/ecosystem"
+# backend/.env.prod must have real JWT_SECRET + POSTGRES_PASSWORD (not replace-with-*)
+make up-prod
+curl -sS http://127.0.0.1:8000/health
+```
+
+- [ ] Docker installed · `docker compose version` works
+- [ ] `backend/.env.prod` filled (gitignored)
+- [ ] `make up-prod` · `/health` 200
 
 ---
 
@@ -99,10 +134,10 @@ cd "/home/taipan/Documents/My Ride/ecosystem"
 # or: cd frontend && source scripts/dart_defines.sh && flutter run "${DART_DEFINES[@]}"
 ```
 
-- [ ] Flutter: `--dart-define=API_BASE_URL=https://<ecosystem-host>`
-- [ ] Hub brand at ecosystem `/`
-- [ ] SOS dials **112** (SA)
-- [ ] Refund auto-cap **R500** still enforced in code paths
+- [ ] Flutter: `--dart-define=API_BASE_URL=https://<ecosystem-host>` (`./run-rider-staging.sh`)
+- [x] Hub brand at ecosystem `/`
+- [x] SOS dials **112** (SA) — `/safety/emergency` + Flutter SOS
+- [x] Refund auto-cap **R500** still enforced (`CustomerServiceAI.MAX_AUTO_REFUND`)
 
 ### C1b. Legacy vs ecosystem Stripe webhooks
 

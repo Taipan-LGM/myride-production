@@ -25,6 +25,8 @@ Root [`render.yaml`](../../render.yaml) defines:
 3. After first deploy, set **sync: false** secrets (below) in Dashboard  
 4. Note public URL: `https://my-ride-ecosystem.onrender.com` (or custom domain)
 
+**Status (2026-07-18):** `GET /health` → 200 (`0.2.1`, redis connected, postgres dual-write). Hub `/` → 200.
+
 ### Env to set in Dashboard (ecosystem service)
 
 | Key | Example / rule |
