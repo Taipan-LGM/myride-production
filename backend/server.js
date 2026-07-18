@@ -173,8 +173,16 @@ app.use(
   })
 );
 
+let appReady = false;
+
 app.get("/api/health", (_req, res) => {
-  res.json({ ok: true, env: NODE_ENV });
+  // Always 200 once process is listening — Render edge needs a fast answer.
+  res.json({
+    ok: true,
+    env: NODE_ENV,
+    ready: appReady,
+    commit: process.env.RENDER_GIT_COMMIT || null,
+  });
 });
 
 app.post(
@@ -260,18 +268,7 @@ async function boot() {
   assertProductionConfig();
   logProductionStripeWarnings();
 
-  const schemaPath = path.resolve(process.cwd(), "db", "schema.sql");
-  // eslint-disable-next-line no-console
-  console.log(`[my-ride] loading schema ${schemaPath}`);
-  const schema = fs.readFileSync(schemaPath, "utf8");
-  initDatabase(schema);
-  // eslint-disable-next-line no-console
-  console.log("[my-ride] schema/migrate ok");
-
-  await ensureAdminBootstrap();
-  // eslint-disable-next-line no-console
-  console.log("[my-ride] admin bootstrap done — binding HTTP");
-
+  // Bind HTTP BEFORE sqlite/migrate so Render health checks are not stuck behind disk I/O.
   await new Promise((resolve, reject) => {
     server.listen(PORT, HOST, () => {
       const lan = guessLanIpv4();
@@ -287,6 +284,19 @@ async function boot() {
     });
     server.on("error", reject);
   });
+
+  const schemaPath = path.resolve(process.cwd(), "db", "schema.sql");
+  // eslint-disable-next-line no-console
+  console.log(`[my-ride] loading schema ${schemaPath}`);
+  const schema = fs.readFileSync(schemaPath, "utf8");
+  initDatabase(schema);
+  // eslint-disable-next-line no-console
+  console.log("[my-ride] schema/migrate ok");
+
+  await ensureAdminBootstrap();
+  appReady = true;
+  // eslint-disable-next-line no-console
+  console.log("[my-ride] ready");
 }
 
 boot().catch((err) => {

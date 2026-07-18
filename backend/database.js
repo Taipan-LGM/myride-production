@@ -8,21 +8,37 @@ dotenv.config();
 
 const SQLITE_PATH = process.env.SQLITE_PATH || "./mycab.sqlite";
 
-if (!String(SQLITE_PATH).includes("memory")) {
-  const dir = path.dirname(path.resolve(SQLITE_PATH));
+/** Lazy open — do not block HTTP bind if disk/SQLite is slow (Render health). */
+let _db = null;
+
+function openDatabase() {
+  if (_db) return _db;
+  if (!String(SQLITE_PATH).includes("memory")) {
+    const dir = path.dirname(path.resolve(SQLITE_PATH));
+    // eslint-disable-next-line no-console
+    console.log(`[my-ride] ensuring sqlite dir: ${dir}`);
+    fs.mkdirSync(dir, { recursive: true });
+  }
   // eslint-disable-next-line no-console
-  console.log(`[my-ride] ensuring sqlite dir: ${dir}`);
-  fs.mkdirSync(dir, { recursive: true });
+  console.log(`[my-ride] opening sqlite: ${SQLITE_PATH}`);
+  _db = new Database(SQLITE_PATH);
+  _db.pragma("journal_mode = WAL");
+  _db.pragma("foreign_keys = ON");
+  // eslint-disable-next-line no-console
+  console.log("[my-ride] sqlite open ok");
+  return _db;
 }
 
-// eslint-disable-next-line no-console
-console.log(`[my-ride] opening sqlite: ${SQLITE_PATH}`);
-export const db = new Database(SQLITE_PATH);
-// eslint-disable-next-line no-console
-console.log("[my-ride] sqlite open ok");
-
-db.pragma("journal_mode = WAL");
-db.pragma("foreign_keys = ON");
+export const db = new Proxy(
+  {},
+  {
+    get(_target, prop, _receiver) {
+      const real = openDatabase();
+      const value = real[prop];
+      return typeof value === "function" ? value.bind(real) : value;
+    },
+  }
+);
 
 function hasColumn(table, column) {
   const cols = db.prepare(`PRAGMA table_info(${table})`).all();
