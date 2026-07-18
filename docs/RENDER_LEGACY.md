@@ -28,7 +28,7 @@ Use this for the **current** Render web service (marketing + customer + driver +
 |-----|----------|-------|
 | `NODE_ENV` | Yes | `production` |
 | `HOST` | Yes | `0.0.0.0` |
-| `JWT_SECRET` | Yes | Long random (Render “generate” OK) |
+| `JWT_SECRET` | Yes | **≥32 characters**. Set on the **live service** Environment tab (Blueprint `generateValue` does not update existing services). |
 | `SQLITE_PATH` | Yes | `/var/data/myride.sqlite` with disk |
 
 ## 3. Strongly recommended

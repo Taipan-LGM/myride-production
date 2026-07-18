@@ -30,7 +30,8 @@ import payoutsRouter from "./routes/payouts.js";
 import { errorHandler } from "./middleware/errorHandler.js";
 import { createRidePaymentIntent } from "./services/ridePaymentIntent.js";
 
-dotenv.config();
+// Never override Render/Dashboard env with a local .env file
+dotenv.config({ override: false });
 
 const PORT = Number(process.env.PORT || 3000);
 const NODE_ENV = process.env.NODE_ENV || "development";
@@ -216,12 +217,17 @@ app.locals.locationService = socketRuntime.locationService;
 
 function assertProductionConfig() {
   if (NODE_ENV !== "production") return;
-  const secret = process.env.JWT_SECRET;
-  if (!secret || secret.length < 32) {
+  const secret = String(process.env.JWT_SECRET || "").trim();
+  const len = secret.length;
+  if (!secret || len < 32) {
     throw new Error(
-      "JWT_SECRET must be set to a strong secret (32+ characters) in production"
+      `JWT_SECRET must be set to a strong secret (32+ characters) in production ` +
+        `(received length=${len}. Set it in Render → this service → Environment → JWT_SECRET, then Redeploy. ` +
+        `Do not put it only in render.yaml after the service already exists.)`
     );
   }
+  // Prefer trimmed value for the rest of the process
+  process.env.JWT_SECRET = secret;
 }
 
 function logProductionStripeWarnings() {
