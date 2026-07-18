@@ -21,10 +21,10 @@ This is the single go-live checklist covering:
 | 1 | Staging URL live (Render ecosystem) | Done — health/hub/112 |
 | 2 | Local PM hub + API smoke (book/SOS/channels) | Done — `scripts/smoke_test.sh` |
 | 3 | Compose/VPS prod stack | Blocked — install Docker (sudo), then `scripts/up-prod-compose.sh` |
-| 4 | Fix Render driver cold-store 500 | In progress — deploy driver-availability fix |
-| 5 | Flutter → ecosystem host (not legacy Node) | Script: `ecosystem/run-rider-staging.sh` |
-| 6 | Live Stripe/Twilio webhooks + `PUBLIC_BASE_URL` | Needs Dashboard secrets |
-| 7 | Go/no-go: book + pay + SOS + admin JWT | After 4–6 |
+| 4 | Fix Render driver cold-store 500 | Done — `c002ee5` · Render smoke full pass |
+| 5 | Flutter → ecosystem host (not legacy Node) | Local rider up (`:8766`); staging: `./run-rider-staging.sh` |
+| 6 | Live Stripe/Twilio webhooks + `PUBLIC_BASE_URL` | Needs Dashboard secrets (you) |
+| 7 | Go/no-go: book + pay + SOS + admin JWT | Book/SOS/admin smoke green; pay needs Stripe |
 | 8 | Rotate/disable demo accounts before public | Before open traffic |
 
 Brief PART 13 (K8s/RN/Elixir) **mapped to Path A:** Compose/Render instead of kubectl; Flutter instead of RN; FastAPI WS instead of Phoenix.
@@ -150,10 +150,10 @@ Twilio (ecosystem only): `/webhooks/whatsapp`, `/webhooks/sms`, `/voice/incoming
 
 ### C3. Go / no-go
 
-- [ ] Book ride (hub + Flutter)
-- [ ] Payment hold/capture (Stripe)
+- [x] Book ride (API smoke local + Render `/ai/book`)
+- [ ] Payment hold/capture (Stripe) — needs live keys
 - [ ] One live WhatsApp / SMS / voice message each (if Twilio live)
-- [ ] Admin metrics only with admin JWT
+- [x] Admin metrics only with admin JWT (smoke ledger)
 - [ ] Rate limit does not starve hub
 - [ ] Demo accounts **rotated or disabled** before public traffic
 - [ ] `USE_POSTGRES_PRIMARY=true` after dual-write soak
