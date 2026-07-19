@@ -140,7 +140,16 @@ def decode_token(token: str, settings: Settings | None = None) -> AuthUser:
     )
 
 
-def authenticate(identifier: str, password: str, role: Role | None = None) -> AuthUser:
+def authenticate(
+    identifier: str,
+    password: str,
+    role: Role | None = None,
+    *,
+    allow_demo: bool | None = None,
+) -> AuthUser:
+    settings = get_settings()
+    if allow_demo is None:
+        allow_demo = bool(settings.allow_demo_accounts)
     key = identifier.strip().lower()
     if key.startswith("+") or key.isdigit():
         # normalize phone lookup
@@ -151,6 +160,11 @@ def authenticate(identifier: str, password: str, role: Role | None = None) -> Au
     record = _DEMO_USERS.get(key)
     if not isinstance(record, dict):
         raise HTTPException(status.HTTP_401_UNAUTHORIZED, "Invalid credentials")
+    if not allow_demo:
+        raise HTTPException(
+            status.HTTP_403_FORBIDDEN,
+            "Demo accounts disabled — set ALLOW_DEMO_ACCOUNTS=true for staging only",
+        )
     if record["password"] != password:
         raise HTTPException(status.HTTP_401_UNAUTHORIZED, "Invalid credentials")
     if role and record["role"] != role:

@@ -60,3 +60,45 @@ def test_stripe_missing_signature_400(monkeypatch):
     with pytest.raises(HTTPException) as ei:
         verify_stripe_webhook(b"{}", "", settings=settings)
     assert ei.value.status_code == 400
+
+
+def test_stripe_production_unconfigured_503():
+    settings = Settings(
+        environment="production",
+        stripe_live_secret_key="",
+        stripe_secret_key="",
+        stripe_webhook_secret="",
+        debug=False,
+        jwt_secret="prod-secret-not-dev-default-xxxxxxxx",
+        cors_origins="https://app.example.co.za",
+        public_base_url="https://app.example.co.za",
+    )
+    with pytest.raises(HTTPException) as ei:
+        verify_stripe_webhook(b"{}", "", settings=settings)
+    assert ei.value.status_code == 503
+
+
+@pytest.mark.asyncio
+async def test_twilio_production_requires_token():
+    from unittest.mock import MagicMock
+
+    from app.webhooks_security import verify_twilio_request
+
+    settings = Settings(
+        environment="production",
+        twilio_auth_token="",
+        debug=False,
+        jwt_secret="prod-secret-not-dev-default-xxxxxxxx",
+        cors_origins="https://app.example.co.za",
+        public_base_url="https://app.example.co.za",
+    )
+    req = MagicMock()
+    req.body = MagicMock(return_value=b"Body=hi&From=%2B2782")
+    # body is async
+    async def _body():
+        return b"Body=hi&From=%2B2782"
+
+    req.body = _body
+    with pytest.raises(HTTPException) as ei:
+        await verify_twilio_request(req, settings=settings)
+    assert ei.value.status_code == 503

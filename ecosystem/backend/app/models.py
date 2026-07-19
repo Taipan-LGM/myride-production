@@ -208,6 +208,16 @@ class HealthResponse(BaseModel):
     services: dict[str, str]
 
 
+class CutoverReadyResponse(BaseModel):
+    """Production cutover readiness — what is live vs still missing."""
+
+    ready_for_public: bool
+    host: str
+    checks: dict[str, bool]
+    missing: list[str]
+    webhook_urls: dict[str, str]
+
+
 class CreatePaymentIntentRequest(BaseModel):
     amount_cents: int
     rider_id: str

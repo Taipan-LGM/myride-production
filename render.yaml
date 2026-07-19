@@ -80,11 +80,14 @@ services:
           name: myride-redis
           type: redis
           property: connectionString
-      # Set after first deploy to the real https://…onrender.com URL (no wildcard)
+      # Defaults match current Render hostname; override if custom domain is attached.
+      # App also derives HTTPS from RENDER_EXTERNAL_URL when these are empty/localhost.
       - key: PUBLIC_BASE_URL
-        sync: false
+        value: https://my-ride-ecosystem.onrender.com
       - key: CORS_ORIGINS
-        sync: false
+        value: https://my-ride-ecosystem.onrender.com
+      - key: ALLOW_DEMO_ACCOUNTS
+        value: "true"
       - key: STRIPE_LIVE_SECRET_KEY
         sync: false
       - key: STRIPE_WEBHOOK_SECRET
@@ -98,6 +101,8 @@ services:
       - key: TWILIO_WHATSAPP_NUMBER
         sync: false
       - key: OPENAI_API_KEY
+        sync: false
+      - key: STRIPE_TEST_SECRET_KEY
         sync: false
 
   - type: redis

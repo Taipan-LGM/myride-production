@@ -58,6 +58,8 @@ class Settings(BaseSettings):
 
     # Auth
     jwt_secret: str = "my-ride-sa-dev-secret-change-me"
+    # Demo rider/driver/admin logins — disable before public traffic
+    allow_demo_accounts: bool = True
 
     # Optional Postgres (schema: database/init.sql).
     # Default: dual-write mirror. Set USE_POSTGRES_PRIMARY=true to make Postgres

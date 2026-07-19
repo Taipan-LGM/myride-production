@@ -137,4 +137,24 @@ curl -sf -X POST "$BASE/fare-estimate" \
   -d '{"pickup":{"lat":-33.9249,"lng":18.4241},"dropoff":{"lat":-33.9180,"lng":18.4232},"vehicle_type":"standard"}' \
   | python3 -m json.tool | head -40
 
+if [[ -n "${TRIP:-}" ]]; then
+  echo "==> POST /payments/hold + /payments/capture"
+  HOLD=$(curl -sf -X POST "$BASE/payments/hold" \
+    -H "Authorization: Bearer $TOKEN" \
+    -H 'Content-Type: application/json' \
+    -d "{\"amount_cents\":4500,\"rider_id\":\"rider-demo-001\",\"trip_id\":\"$TRIP\",\"currency\":\"zar\"}")
+  echo "$HOLD" | python3 -m json.tool | head -20
+  PI=$(echo "$HOLD" | python3 -c "import sys,json; print(json.load(sys.stdin).get('id') or '')")
+  if [[ -n "$PI" ]]; then
+    curl -sf -X POST "$BASE/payments/capture" \
+      -H "Authorization: Bearer $DTOKEN" \
+      -H 'Content-Type: application/json' \
+      -d "{\"payment_intent_id\":\"$PI\",\"trip_id\":\"$TRIP\",\"amount_cents\":4500}" \
+      | python3 -m json.tool | head -15
+  fi
+fi
+
+echo "==> GET /ops/cutover"
+curl -sf "$BASE/ops/cutover" | python3 -m json.tool | head -40
+
 echo "OK — production smoke passed"

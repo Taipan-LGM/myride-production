@@ -56,6 +56,9 @@ async def connect_postgres(settings: Settings | None = None) -> None:
         _status = "connected"
         mode = "PRIMARY" if _primary else "dual-write"
         logger.info("Postgres connected (%s)", mode)
+        from app.schema_migrate import apply_schema
+
+        await apply_schema(_pool)
     except Exception as exc:
         _pool = None
         _status = "error"

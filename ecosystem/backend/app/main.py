@@ -37,6 +37,7 @@ from app.models import (
     AiParseRequest,
     AiSupportRequest,
     ChannelSimulateRequest,
+    CutoverReadyResponse,
     DriverLocationUpdate,
     GeoPoint,
     HealthResponse,
@@ -259,8 +260,10 @@ async def auth_me(user=Depends(get_current_user)):
 
 
 @app.get("/auth/demo-accounts")
-async def auth_demo_accounts():
-    """Public demo credentials for SA ecosystem testing."""
+async def auth_demo_accounts(settings: Settings = Depends(settings_dep)):
+    """Public demo credentials for SA ecosystem testing (disabled when ALLOW_DEMO_ACCOUNTS=false)."""
+    if not settings.allow_demo_accounts:
+        raise HTTPException(403, "Demo accounts disabled")
     return {"accounts": demo_credentials()}
 
 
@@ -282,6 +285,57 @@ async def health(
             "redis": "connected" if cache.enabled else "optional-offline",
             "postgres": postgres_status(),
             "ml": _ml_health_label(),
+        },
+    )
+
+
+@app.get("/ops/cutover", response_model=CutoverReadyResponse)
+async def cutover_ready(
+    settings: Settings = Depends(settings_dep),
+    cache: RedisCache = Depends(cache_dep),
+) -> CutoverReadyResponse:
+    """Public readiness snapshot for Path A go-live (no secrets)."""
+    stripe = get_stripe()
+    voice = get_voice()
+    host = (settings.public_base_url or "").rstrip("/") or "http://127.0.0.1:8000"
+    checks = {
+        "https_public_base": host.startswith("https://"),
+        "cors_locked": settings.cors_origins.strip() not in ("", "*"),
+        "jwt_strong": len(settings.jwt_secret.strip()) >= 32
+        and not settings.jwt_secret.startswith("my-ride-sa-dev"),
+        "stripe_configured": bool(stripe.enabled),
+        "stripe_webhook_secret": bool(settings.stripe_webhook_secret),
+        "twilio_configured": bool(voice.enabled),
+        "postgres_connected": postgres_status() in ("dual-write", "primary"),
+        "redis_connected": bool(cache.enabled),
+        "demo_accounts_allowed": bool(settings.allow_demo_accounts),
+        "debug_off": not settings.debug,
+        "environment_production": settings.environment == "production",
+    }
+    # Public launch requires payments + locked CORS/JWT + demos off
+    required = [
+        "https_public_base",
+        "cors_locked",
+        "jwt_strong",
+        "stripe_configured",
+        "stripe_webhook_secret",
+        "debug_off",
+        "environment_production",
+    ]
+    missing = [k for k in required if not checks[k]]
+    if checks["demo_accounts_allowed"]:
+        missing.append("demo_accounts_disabled")
+    return CutoverReadyResponse(
+        ready_for_public=len(missing) == 0,
+        host=host,
+        checks=checks,
+        missing=missing,
+        webhook_urls={
+            "stripe": f"{host}/webhooks/stripe",
+            "whatsapp": f"{host}/webhooks/whatsapp",
+            "sms": f"{host}/webhooks/sms",
+            "voice_incoming": f"{host}/voice/incoming",
+            "voice_gather": f"{host}/voice/gather",
         },
     )
 
