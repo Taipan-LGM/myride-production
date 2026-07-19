@@ -1,6 +1,6 @@
 # Cutover checklist — My Ride SA → live (A + B + C)
 
-**Ecosystem version:** `0.2.1` · **Legacy web:** `1.0.3`  
+**Ecosystem version:** `0.2.2` · **Legacy web:** `1.0.3`  
 **Repo:** https://github.com/Taipan-LGM/My-Ride  
 
 This is the single go-live checklist covering:
