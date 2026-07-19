@@ -23,9 +23,9 @@ This is the single go-live checklist covering:
 | 3 | Compose/VPS prod stack | Blocked — install Docker (sudo), then `scripts/up-prod-compose.sh` |
 | 4 | Fix Render driver cold-store 500 | Done — `c002ee5` · Render smoke full pass |
 | 5 | Flutter → ecosystem host (not legacy Node) | Local rider up (`:8766`); staging: `./run-rider-staging.sh` |
-| 6 | Live Stripe/Twilio webhooks + `PUBLIC_BASE_URL` | Needs Dashboard secrets (you) |
-| 7 | Go/no-go: book + pay + SOS + admin JWT | Book/SOS/admin smoke green; pay needs Stripe |
-| 8 | Rotate/disable demo accounts before public | Before open traffic |
+| 6 | Live Stripe/Twilio webhooks + `PUBLIC_BASE_URL` | CORS/URL auto; **Stripe/Twilio keys = you** |
+| 7 | Go/no-go: book + pay + SOS + admin JWT | Book/SOS/admin/hold-mock green; live pay needs Stripe |
+| 8 | Rotate/disable demo accounts before public | `ALLOW_DEMO_ACCOUNTS=false` — see [PUBLIC_LAUNCH.md](./PUBLIC_LAUNCH.md) |
 
 Brief PART 13 (K8s/RN/Elixir) **mapped to Path A:** Compose/Render instead of kubectl; Flutter instead of RN; FastAPI WS instead of Phoenix.
 

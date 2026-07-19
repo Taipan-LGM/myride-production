@@ -62,5 +62,8 @@ flutter-rider:
 flutter-rider-staging:
 	@./run-rider-staging.sh
 
+flutter-driver-staging:
+	@./run-driver-staging.sh
+
 flutter-driver:
 	@./run-driver.sh

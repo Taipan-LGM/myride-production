@@ -45,7 +45,7 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
         self._hits: dict[str, deque[float]] = defaultdict(deque)
 
     # Paths that browsers / ops / providers probe often — do not burn the bucket
-    _SKIP_PREFIXES = ("/static", "/health", "/favicon", "/webhooks", "/voice")
+    _SKIP_PREFIXES = ("/static", "/health", "/favicon", "/webhooks", "/voice", "/ops")
 
     async def dispatch(self, request: Request, call_next: Callable) -> Response:
         path = request.url.path

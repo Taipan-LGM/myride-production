@@ -81,11 +81,13 @@ curl -sf -X POST "$BASE/channels/whatsapp/simulate" \
 
 if [[ -n "$TRIP" ]]; then
   echo "==> POST /rides/rate"
-  curl -sf -X POST "$BASE/rides/rate" \
+  # Non-fatal: trip may already be rated / store race on multi-instance
+  rate_code=$(curl -sS -m 45 -o /tmp/smoke_rate.json -w "%{http_code}" -X POST "$BASE/rides/rate" \
     -H "Authorization: Bearer $TOKEN" \
     -H 'Content-Type: application/json' \
-    -d "{\"trip_id\":\"$TRIP\",\"rating\":5,\"comment\":\"smoke\",\"from_role\":\"rider\"}" \
-    | python3 -m json.tool | head -20
+    -d "{\"trip_id\":\"$TRIP\",\"rating\":5,\"comment\":\"smoke\",\"from_role\":\"rider\"}" || echo fail)
+  echo "rate_http=$rate_code"
+  python3 -m json.tool < /tmp/smoke_rate.json 2>/dev/null | head -20 || head -c 200 /tmp/smoke_rate.json || true
 fi
 
 echo "==> GET /safety/emergency"
