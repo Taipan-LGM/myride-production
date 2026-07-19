@@ -307,10 +307,12 @@ async def cutover_ready(
         "stripe_webhook_secret": bool(settings.stripe_webhook_secret),
         "twilio_configured": bool(voice.enabled),
         "postgres_connected": postgres_status() in ("dual-write", "primary"),
+        "postgres_primary": postgres_status() == "primary",
         "redis_connected": bool(cache.enabled),
         "demo_accounts_allowed": bool(settings.allow_demo_accounts),
         "debug_off": not settings.debug,
         "environment_production": settings.environment == "production",
+        "phase0_seed_allowed": bool(settings.allow_phase0_seed),
     }
     # Public launch requires payments + locked CORS/JWT + demos off
     required = [
@@ -356,6 +358,38 @@ async def dev_seed(db: FirestoreDB = Depends(db_dep)) -> dict[str, Any]:
     if not get_settings().debug:
         raise HTTPException(403, "Enable DEBUG=true to use /dev/seed")
     return await seed_demo_data(db)
+
+
+@app.post("/admin/phase0/bootstrap")
+async def admin_phase0_bootstrap(
+    db: FirestoreDB = Depends(db_dep),
+    _admin: AuthUser = Depends(require_role("admin")),
+    drivers: int = 100,
+    rides: int = 1000,
+) -> dict[str, Any]:
+    """Phase 0: seed ~100 drivers + ~1000 completed rides (admin JWT)."""
+    settings = get_settings()
+    if not settings.allow_phase0_seed and settings.environment == "production":
+        raise HTTPException(403, "ALLOW_PHASE0_SEED=false — Phase 0 seed disabled")
+    from app.phase0_ops import phase0_bootstrap
+
+    drivers = max(1, min(drivers, 500))
+    rides = max(1, min(rides, 5000))
+    result = await phase0_bootstrap(db, drivers=drivers, rides=rides)
+    return {"ok": True, **result}
+
+
+@app.post("/admin/phase0/drivers")
+async def admin_phase0_drivers(
+    db: FirestoreDB = Depends(db_dep),
+    _admin: AuthUser = Depends(require_role("admin")),
+    count: int = 100,
+) -> dict[str, Any]:
+    if not get_settings().allow_phase0_seed and get_settings().environment == "production":
+        raise HTTPException(403, "ALLOW_PHASE0_SEED=false")
+    from app.phase0_ops import seed_drivers
+
+    return await seed_drivers(db, count)
 
 
 @app.post("/ai/parse")

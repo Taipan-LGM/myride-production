@@ -3,19 +3,22 @@
 Code Path A is staged at **https://my-ride-ecosystem.onrender.com**.  
 `GET /ops/cutover` reports what is still missing for `ready_for_public: true`.
 
+**How to obtain keys:** see **[GET_API_KEYS.md](./GET_API_KEYS.md)** — the agent does not have your Stripe/Twilio/OpenAI secrets.
+
 ## You must set in Render Dashboard (`my-ride-ecosystem`)
 
 | Env | Value |
 |-----|--------|
-| `STRIPE_LIVE_SECRET_KEY` | `sk_live_…` |
-| `STRIPE_WEBHOOK_SECRET` | `whsec_…` from Stripe endpoint |
+| `STRIPE_LIVE_SECRET_KEY` | `sk_live_…` (from Stripe Dashboard) |
+| `STRIPE_WEBHOOK_SECRET` | `whsec_…` from Stripe webhook endpoint |
 | `TWILIO_ACCOUNT_SID` | `AC…` |
 | `TWILIO_AUTH_TOKEN` | token |
 | `TWILIO_PHONE_NUMBER` | SA voice/SMS number |
 | `TWILIO_WHATSAPP_NUMBER` | `whatsapp:+27…` |
 | `OPENAI_API_KEY` | optional (heuristic AI works without) |
 | `ALLOW_DEMO_ACCOUNTS` | `false` **before public traffic** |
-| `USE_POSTGRES_PRIMARY` | `true` after dual-write soak |
+| `USE_POSTGRES_PRIMARY` | `true` (blueprint updated; set on existing service if still `false`) |
+| `ALLOW_PHASE0_SEED` | `true` on staging for `/admin/phase0/bootstrap`; `false` for public |
 
 `PUBLIC_BASE_URL` / `CORS_ORIGINS` default to the Render hostname via `render.yaml` + `RENDER_EXTERNAL_URL`.
 

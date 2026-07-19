@@ -67,8 +67,11 @@ services:
         value: info
       - key: STRIPE_CURRENCY
         value: zar
+      # Dual-write soaked (redis+postgres connected on staging) — promote Postgres
       - key: USE_POSTGRES_PRIMARY
-        value: "false"
+        value: "true"
+      - key: ALLOW_PHASE0_SEED
+        value: "true"
       - key: JWT_SECRET
         generateValue: true
       - key: DATABASE_URL

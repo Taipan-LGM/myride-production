@@ -60,6 +60,8 @@ class Settings(BaseSettings):
     jwt_secret: str = "my-ride-sa-dev-secret-change-me"
     # Demo rider/driver/admin logins — disable before public traffic
     allow_demo_accounts: bool = True
+    # Admin-only Phase 0 bulk seed (/admin/phase0/*) — keep true on staging
+    allow_phase0_seed: bool = True
 
     # Optional Postgres (schema: database/init.sql).
     # Default: dual-write mirror. Set USE_POSTGRES_PRIMARY=true to make Postgres
