@@ -3,8 +3,11 @@
   const STORAGE_KEY = "myride_session_v1";
   const PREFS_KEY = "myride_prefs_v1";
   let session = null; // { token, user }
-  let maps = { rider: null, driver: null };
-  let markers = { pickup: null, dropoff: null, driver: null };
+  let maps = { rider: null, driver: null, admin: null };
+  let markers = { pickup: null, dropoff: null, driver: null, fleet: new Map() };
+  let fleetHasFit = false;
+  let fleetRefreshInFlight = false;
+  let fleetGeneration = 0;
   let routeLine = null;
   let activeTripId = null;
   let lastOffer = null;
@@ -345,7 +348,9 @@
     try { data = JSON.parse(text); } catch { data = { raw: text }; }
     if (!res.ok) {
       const detail = data.detail || text || res.statusText;
-      throw new Error(typeof detail === "string" ? detail : JSON.stringify(detail));
+      const error = new Error(typeof detail === "string" ? detail : JSON.stringify(detail));
+      error.status = res.status;
+      throw error;
     }
     return data;
   }
@@ -400,7 +405,11 @@
       $("#driver-id").value = session.user.id;
     }
     renderNav();
-    showView("home");
+    const stripeAction = new URLSearchParams(location.search).get("stripe_connect");
+    const stripeReturn = Boolean(stripeAction);
+    showView(stripeReturn && session.user.role === "driver" ? "settings" : "home");
+    if (stripeReturn) history.replaceState({}, "", location.pathname);
+    if (stripeAction === "refresh" && session.user.role === "driver") startPayoutOnboarding();
     bootStatus();
   }
 
@@ -420,15 +429,82 @@
       loadSavedPlaceChips();
     }
     if (name === "driver") ensureMap("driver");
-    if (name === "admin") refreshMetrics();
+    if (name === "admin") {
+      refreshMetrics();
+      refreshFleet();
+      refreshRemuneration();
+      refreshReconciliationQueue();
+    }
     if (name === "channels") loadChannelInfo();
     if (name === "wallet") refreshWallet();
     if (name === "safety") refreshSafety();
     if (name === "driver") refreshEarnings();
+    if (name === "settings") refreshPayoutAccount();
+  }
+
+  function renderPayoutAccount(data) {
+    const panel = $("#driver-payout-panel");
+    const summary = $("#driver-payout-summary");
+    const state = $("#driver-payout-state");
+    const button = $("#btn-connect-payouts");
+    if (!panel || !summary || !state || !button) return;
+    panel.hidden = session?.user?.role !== "driver";
+    if (panel.hidden) return;
+    const accountSuffix = data.account_id ? ` · ${String(data.account_id).slice(-8)}` : "";
+    if (data.status === "ready") {
+      summary.textContent = `Payouts are enabled${accountSuffix}`;
+      state.className = "fleet-state live";
+      state.textContent = data.dev_mode ? "Ready · local simulation" : "Ready for driver transfers";
+      button.textContent = "Manage payouts";
+    } else if (data.status === "pending") {
+      summary.textContent = `Stripe needs more information${accountSuffix}`;
+      state.className = "fleet-state";
+      state.textContent = "Setup incomplete";
+      button.textContent = "Continue setup";
+    } else {
+      summary.textContent = "Connect a verified account to receive trip earnings.";
+      state.className = "fleet-state";
+      state.textContent = "Not connected";
+      button.textContent = "Set up payouts";
+    }
+  }
+
+  async function refreshPayoutAccount() {
+    const panel = $("#driver-payout-panel");
+    if (!panel) return;
+    panel.hidden = session?.user?.role !== "driver";
+    if (panel.hidden) return;
+    try {
+      renderPayoutAccount(await api("/drivers/me/stripe-connect"));
+    } catch (error) {
+      $("#driver-payout-state").className = "fleet-state error";
+      $("#driver-payout-state").textContent = error.status === 503
+        ? "South African payouts require provider approval"
+        : error.message;
+      $("#btn-connect-payouts").disabled = error.status === 503;
+    }
+  }
+
+  async function startPayoutOnboarding() {
+    const button = $("#btn-connect-payouts");
+    const state = $("#driver-payout-state");
+    button.disabled = true;
+    state.className = "fleet-state";
+    state.textContent = "Preparing secure setup…";
+    try {
+      const result = await api("/drivers/me/stripe-connect/onboarding", { method: "POST" });
+      renderPayoutAccount(result);
+      if (result.onboarding_url) location.assign(result.onboarding_url);
+    } catch (error) {
+      state.className = "fleet-state error";
+      state.textContent = error.message;
+    } finally {
+      button.disabled = false;
+    }
   }
 
   function ensureMap(kind) {
-    const id = kind === "rider" ? "map-rider" : "map-driver";
+    const id = kind === "rider" ? "map-rider" : kind === "driver" ? "map-driver" : "map-admin";
     if (maps[kind]) {
       setTimeout(() => maps[kind].invalidateSize(), 40);
       return maps[kind];
@@ -498,6 +574,9 @@
 
   function logout() {
     if (driverWs) driverWs.close();
+    fleetGeneration += 1;
+    fleetRefreshInFlight = false;
+    clearFleetMarkers();
     saveSession(null);
     showLogin();
   }
@@ -738,8 +817,11 @@
         ? `/driver/earnings/${id}`
         : "/driver/earnings";
       const data = await api(path);
+      const shareLabel = data.driver_share_percent == null
+        ? "mixed historical policies"
+        : `${Number(data.driver_share_percent).toFixed(2).replace(/\.00$/, "")}% driver share`;
       $("#earnings-summary").textContent =
-        `Today R${Number(data.today_zar).toFixed(2)} · Total R${Number(data.total_zar).toFixed(2)} · ${data.trips} trips (80% driver share)`;
+        `Today R${Number(data.today_zar).toFixed(2)} · Total R${Number(data.total_zar).toFixed(2)} · ${data.trips} trips (${shareLabel})`;
       if ($("#driver-out") && data.recent?.length) {
         /* keep existing driver-out unless empty-ish */
       }
@@ -797,7 +879,8 @@
       ["Live rides", m.live_rides],
       ["Active drivers", m.active_drivers],
       ["AI resolution", `${m.ai_resolution_rate}%`],
-      ["Revenue", `R${(m.revenue_today_zar || 0).toFixed(2)}`],
+      ["Today's revenue", `R${(m.platform_revenue_zar || 0).toFixed(2)}`],
+      ["Today's bookings", `R${(m.gross_booking_value_zar || 0).toFixed(2)}`],
       ["Avg fare", `R${(m.avg_fare_zar || 0).toFixed(2)}`],
       ["Completed", m.completed_rides],
     ];
@@ -805,6 +888,195 @@
       .map(([k, v]) => `<div class="metric"><div class="k">${k}</div><div class="v">${v}</div></div>`)
       .join("");
     $("#admin-out").textContent = JSON.stringify(m, null, 2);
+  }
+
+  async function refreshReconciliationQueue() {
+    const list = $("#reconciliation-list");
+    const state = $("#reconciliation-state");
+    if (!list || !state) return;
+    try {
+      const data = await api("/admin/reconciliations");
+      const items = data.items || [];
+      state.className = items.some((item) => item.status === "failed")
+        ? "fleet-state error"
+        : "fleet-state live";
+      state.textContent = items.length ? `${items.length} need attention` : "All payouts reconciled";
+      list.innerHTML = items.length
+        ? items.map((item) => `
+          <div class="fleet-vehicle reconciliation-row">
+            <span>
+              <strong>${escapeHtml(item.trip_id)}</strong>
+              <span>R${(Number(item.fare_cents || 0) / 100).toFixed(2)} · ${escapeHtml(item.status)} · ${Number(item.attempt_count || 0)} attempts</span>
+              ${item.error ? `<span>${escapeHtml(item.error)}</span>` : ""}
+            </span>
+            <button type="button" class="btn ghost" data-retry-reconciliation="${escapeHtml(item.trip_id)}" ${item.status === "pending" && item.attempted_at ? "disabled" : ""}>${item.status === "pending" && item.attempted_at ? "In progress" : "Retry payout"}</button>
+          </div>`).join("")
+        : '<div class="fleet-vehicle"><strong>No pending payouts</strong><span>Completed driver transfers are up to date.</span></div>';
+    } catch (error) {
+      state.className = "fleet-state error";
+      state.textContent = "Queue unavailable";
+      list.innerHTML = `<div class="fleet-vehicle"><strong>Could not load payouts</strong><span>${escapeHtml(error.message)}</span></div>`;
+    }
+  }
+
+  async function retryReconciliation(button) {
+    const tripId = button.dataset.retryReconciliation;
+    if (!tripId) return;
+    button.disabled = true;
+    button.textContent = "Retrying…";
+    try {
+      const record = await api(`/payments/reconcile/${encodeURIComponent(tripId)}`, { method: "POST" });
+      $("#admin-out").textContent = JSON.stringify(record, null, 2);
+    } catch (error) {
+      $("#admin-out").textContent = error.message;
+    } finally {
+      await refreshReconciliationQueue();
+      await refreshMetrics();
+    }
+  }
+
+  async function submitTripRefund(event) {
+    event.preventDefault();
+    const tripId = $("#refund-trip-id").value.trim();
+    const reason = $("#refund-reason").value.trim();
+    const confirmed = $("#refund-confirm").checked;
+    const state = $("#refund-state");
+    const button = event.submitter || event.target.querySelector('button[type="submit"]');
+    if (!confirmed) {
+      state.className = "fleet-state error";
+      state.textContent = "Confirm the full refund first";
+      return;
+    }
+    button.disabled = true;
+    state.className = "fleet-state";
+    state.textContent = "Reversing payout and refunding rider…";
+    try {
+      const result = await api(`/payments/refund/${encodeURIComponent(tripId)}`, {
+        method: "POST",
+        body: JSON.stringify({ reason }),
+      });
+      state.className = result.status === "refunded" ? "fleet-state live" : "fleet-state";
+      state.textContent = result.status === "refunded"
+        ? `Refunded R${(Number(result.amount_cents || 0) / 100).toFixed(2)}`
+        : `Refund pending · R${(Number(result.amount_cents || 0) / 100).toFixed(2)}`;
+      $("#refund-confirm").checked = false;
+      $("#admin-out").textContent = JSON.stringify(result, null, 2);
+      await refreshMetrics();
+    } catch (error) {
+      state.className = "fleet-state error";
+      state.textContent = error.message;
+    } finally {
+      button.disabled = false;
+    }
+  }
+
+  async function refreshRemuneration() {
+    const input = $("#driver-share-percent");
+    const state = $("#remuneration-state");
+    if (!input || !state) return;
+    try {
+      const policy = await api("/admin/settings/remuneration");
+      input.value = (Number(policy.driver_share_bps) / 100).toFixed(2).replace(/\.00$/, "");
+      state.className = "fleet-state live";
+      state.textContent = `Version ${policy.version} · applies to new trips`;
+    } catch (error) {
+      state.className = "fleet-state error";
+      state.textContent = error.message;
+    }
+  }
+
+  async function saveRemuneration(event) {
+    event.preventDefault();
+    const input = $("#driver-share-percent");
+    const state = $("#remuneration-state");
+    const percent = Number(input?.value);
+    if (!Number.isFinite(percent) || percent < 0 || percent > 100) {
+      state.className = "fleet-state error";
+      state.textContent = "Enter a percentage from 0 to 100";
+      return;
+    }
+    const policy = await api("/admin/settings/remuneration", {
+      method: "PATCH",
+      body: JSON.stringify({ driver_share_bps: Math.round(percent * 100) }),
+    });
+    state.className = "fleet-state live";
+    state.textContent = `Version ${policy.version} saved · new trips use ${percent.toFixed(2).replace(/\.00$/, "")}%`;
+  }
+
+  function escapeHtml(value) {
+    const element = document.createElement("span");
+    element.textContent = String(value ?? "");
+    return element.innerHTML;
+  }
+
+  function clearFleetMarkers() {
+    if (maps.admin) {
+      markers.fleet.forEach((marker) => maps.admin.removeLayer(marker));
+    }
+    markers.fleet.clear();
+    fleetHasFit = false;
+  }
+
+  async function refreshFleet() {
+    const state = $("#fleet-state");
+    const list = $("#fleet-list");
+    if (!state || !list || fleetRefreshInFlight) return;
+    const generation = fleetGeneration;
+    fleetRefreshInFlight = true;
+    state.className = "fleet-state";
+    state.textContent = "Refreshing…";
+    try {
+      const data = await api("/admin/fleet/vehicles");
+      if (generation !== fleetGeneration) return;
+      const map = ensureMap("admin");
+      const seen = new Set();
+      const bounds = [];
+      (data.vehicles || []).forEach((vehicle) => {
+        seen.add(vehicle.id);
+        bounds.push([vehicle.lat, vehicle.lng]);
+        const popup = `<strong>${escapeHtml(vehicle.label)}</strong><br>${escapeHtml(vehicle.registration)}<br>${Number(vehicle.speed_kph || 0).toFixed(0)} km/h · ${vehicle.ignition ? "Ignition on" : "Ignition off"}`;
+        let marker = markers.fleet.get(vehicle.id);
+        if (marker) marker.setLatLng([vehicle.lat, vehicle.lng]).setPopupContent(popup);
+        else {
+          marker = L.circleMarker([vehicle.lat, vehicle.lng], {
+            radius: 9, color: "#17231c", fillColor: vehicle.ignition ? "#FDB813" : "#8b9890", fillOpacity: 1, weight: 2,
+          }).addTo(map).bindPopup(popup);
+          markers.fleet.set(vehicle.id, marker);
+        }
+        marker.setStyle({ fillColor: vehicle.ignition ? "#FDB813" : "#8b9890" });
+      });
+      markers.fleet.forEach((marker, id) => {
+        if (!seen.has(id)) {
+          map.removeLayer(marker);
+          markers.fleet.delete(id);
+        }
+      });
+      if (bounds.length && !fleetHasFit) {
+        map.fitBounds(L.latLngBounds(bounds).pad(.25), { maxZoom: 15 });
+        fleetHasFit = true;
+      }
+      list.innerHTML = (data.vehicles || []).map((vehicle) => `<div class="fleet-vehicle"><strong>${escapeHtml(vehicle.label)}</strong><span>${escapeHtml(vehicle.registration)} · ${Number(vehicle.speed_kph || 0).toFixed(0)} km/h · ${vehicle.ignition ? "On" : "Off"}</span></div>`).join("");
+      if (!data.vehicles?.length) list.innerHTML = '<div class="fleet-vehicle"><strong>No vehicles reported</strong><span>Cartrack returned an empty fleet.</span></div>';
+      state.className = "fleet-state live";
+      state.textContent = `${data.vehicles?.length || 0} vehicles · Live`;
+      setTimeout(() => map.invalidateSize(), 40);
+    } catch (error) {
+      if (generation !== fleetGeneration) return;
+      clearFleetMarkers();
+      state.className = "fleet-state error";
+      if (error.status === 503) {
+        state.textContent = "Configuration required";
+        list.innerHTML = '<div class="fleet-vehicle"><strong>Cartrack is not connected</strong><span>Configure the server-side account credentials to activate live fleet telemetry.</span></div>';
+      } else if (error.status === 401 || error.status === 403) {
+        state.textContent = "Admin access required";
+        list.innerHTML = '<div class="fleet-vehicle"><strong>Fleet access unavailable</strong><span>Sign in with an administrator account.</span></div>';
+      } else {
+        state.textContent = "Provider unavailable";
+        list.innerHTML = '<div class="fleet-vehicle"><strong>Live telemetry is unavailable</strong><span>Cartrack could not be reached. Try refreshing shortly.</span></div>';
+      }
+    } finally {
+      if (generation === fleetGeneration) fleetRefreshInFlight = false;
+    }
   }
 
   // Role tabs
@@ -855,6 +1127,8 @@
   on("#login-form", "submit", doLogin);
   on("#btn-logout", "click", logout);
   on("#btn-settings-nav", "click", () => showView("settings"));
+  on("#btn-connect-payouts", "click", () => startPayoutOnboarding());
+  on("#btn-refresh-payouts", "click", () => refreshPayoutAccount());
   on("#theme-seg", "click", (e) => {
     const btn = e.target.closest("[data-theme]");
     if (!btn) return;
@@ -1070,14 +1344,16 @@
   on("#btn-refresh-metrics", "click", () => {
     refreshMetrics().catch((e) => { $("#admin-out").textContent = e.message; });
   });
-  on("#btn-reconcile", "click", () => {
-    if (!activeTripId) {
-      $("#admin-out").textContent = "No trip_id — book + complete a ride first.";
-      return;
-    }
-    api(`/payments/reconcile/${activeTripId}`, { method: "POST" })
-      .then((d) => { $("#admin-out").textContent = JSON.stringify(d, null, 2); })
-      .catch((e) => { $("#admin-out").textContent = e.message; });
+  on("#btn-refresh-fleet", "click", () => refreshFleet());
+  on("#btn-refresh-reconciliations", "click", () => refreshReconciliationQueue());
+  on("#remuneration-form", "submit", (event) => saveRemuneration(event).catch((error) => {
+    $("#remuneration-state").className = "fleet-state error";
+    $("#remuneration-state").textContent = error.message;
+  }));
+  on("#refund-form", "submit", (event) => submitTripRefund(event));
+  on("#reconciliation-list", "click", (event) => {
+    const button = event.target.closest("[data-retry-reconciliation]");
+    if (button) retryReconciliation(button);
   });
   on("#btn-ledger", "click", () => {
     api("/payments/ledger")
@@ -1121,6 +1397,8 @@
       $("#view-admin")?.classList.contains("active")
     ) {
       refreshMetrics().catch(() => {});
+      refreshFleet().catch(() => {});
+      refreshReconciliationQueue().catch(() => {});
     }
   }, 8000);
 })();

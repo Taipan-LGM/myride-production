@@ -32,11 +32,10 @@ from app.models import (
     VoiceMessageRequest,
     WebSocketEvent,
 )
-from app.reconciliation import get_reconciliation
+from app.reconciliation import calculate_fare_split, get_reconciliation
 from app.rider_services import (
     award_loyalty_for_trip,
     carbon_for_distance_km,
-    record_driver_earning,
 )
 from app.stripe_service import get_stripe
 
@@ -289,37 +288,49 @@ async def complete_ride(
     user: AuthUser = Depends(require_role("driver", "admin")),
 ):
     trip = await _require_trip_driver(trip_id, db, user)
-    if trip.payment_intent_id:
-        await get_stripe().capture(trip.payment_intent_id, trip.fare_estimate_cents)
-    trip = await db.update_trip(
-        trip_id,
-        {
-            "status": TripStatus.completed.value,
-            "payment_status": "captured",
-            "fare_final_cents": trip.fare_estimate_cents,
-        },
-    )
-    recon = None
+    was_completed = trip.status == TripStatus.completed
+    if was_completed and trip.reconciliation_status == "reconciled":
+        raise HTTPException(409, "Trip is already completed")
+    stripe = get_stripe()
+    if not was_completed and stripe.enabled and not trip.payment_intent_id and trip.payment_status != "captured":
+        raise HTTPException(409, "Trip payment is not authorized")
+    if not was_completed and trip.payment_intent_id:
+        capture = await stripe.capture(trip.payment_intent_id, trip.fare_estimate_cents, trip.id)
+        if capture.get("status") != "succeeded":
+            raise HTTPException(409, "Trip payment capture is not complete")
+    if not was_completed:
+        trip = await db.update_trip(
+            trip_id,
+            {
+                "status": TripStatus.completed.value,
+                "payment_status": "captured",
+                "captured_amount_cents": trip.fare_estimate_cents,
+                "fare_final_cents": trip.fare_estimate_cents,
+            },
+        )
     try:
         recon = (await get_reconciliation().reconcile_trip(db, trip_id)).to_dict()
     except Exception as exc:
-        logger.warning("Reconciliation skipped for %s: %s", trip_id, exc)
+        logger.warning("Reconciliation pending for %s: %s", trip_id, exc)
+        raise HTTPException(503, "Trip completed; payout reconciliation pending") from exc
+    trip = await db.get_trip(trip_id) or trip
 
     fare_cents = int(trip.fare_final_cents or trip.fare_estimate_cents or 0)
-    driver_net = int(round(fare_cents * 0.80))
+    driver_share_bps = int(
+        trip.driver_share_bps
+        if trip.driver_share_bps is not None
+        else db.settings.default_driver_share_bps
+    )
+    driver_net = (
+        int(recon["driver_payout_cents"])
+        if recon
+        else calculate_fare_split(fare_cents, driver_share_bps)[0]
+    )
     loyalty = None
-    earnings = None
     carbon = None
     try:
         if trip.rider_id:
             loyalty = award_loyalty_for_trip(trip.rider_id, fare_cents)
-        if trip.driver_id:
-            earnings = record_driver_earning(
-                trip.driver_id,
-                trip_id=trip_id,
-                amount_cents=driver_net,
-                fare_cents=fare_cents,
-            )
         if trip.pickup and trip.dropoff:
             dist = haversine_km(trip.pickup, trip.dropoff)
             carbon = carbon_for_distance_km(dist)
@@ -346,7 +357,7 @@ async def complete_ride(
                 "status": "completed",
                 "reconciliation": recon,
                 "loyalty": loyalty,
-                "driver_earning": earnings,
+                "driver_earning": {"amount_cents": driver_net, "driver_share_bps": driver_share_bps},
                 "carbon": carbon,
             },
         },
@@ -355,11 +366,12 @@ async def complete_ride(
         "trip": trip,
         "reconciliation": recon,
         "loyalty": loyalty,
-        "driver_earning": earnings,
+        "driver_earning": {"amount_cents": driver_net, "driver_share_bps": driver_share_bps},
         "carbon": carbon,
         "receipt": {
             "fare_cents": fare_cents,
             "driver_net_cents": driver_net,
+            "driver_share_bps": driver_share_bps,
             "currency": "zar",
             "carbon": carbon,
         },

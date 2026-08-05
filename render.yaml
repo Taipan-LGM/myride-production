@@ -67,6 +67,8 @@ services:
         value: info
       - key: STRIPE_CURRENCY
         value: zar
+      - key: STRIPE_CONNECT_ZA_APPROVED
+        value: "false"
       # Dual-write soaked (redis+postgres connected on staging) — promote Postgres
       - key: USE_POSTGRES_PRIMARY
         value: "true"
@@ -106,6 +108,14 @@ services:
       - key: OPENAI_API_KEY
         sync: false
       - key: STRIPE_TEST_SECRET_KEY
+        sync: false
+      - key: CARTRACK_ENABLED
+        value: "false"
+      - key: CARTRACK_BASE_URL
+        value: https://fleetapi-za.cartrack.com/rest
+      - key: CARTRACK_USERNAME
+        sync: false
+      - key: CARTRACK_API_KEY
         sync: false
 
   - type: redis

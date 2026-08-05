@@ -25,6 +25,7 @@ venv/
 **/.dart_tool/
 **/.flutter-plugins
 **/.flutter-plugins-dependencies
+**/data/ml/*.json
 
 # Generated knowledge graphs (rebuild with graphify update)
 graphify-out/

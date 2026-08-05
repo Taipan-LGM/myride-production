@@ -23,6 +23,13 @@ def validate_settings(settings: Settings) -> list[str]:
             warnings.append("Stripe live/secret key missing in production")
         elif not settings.stripe_webhook_secret:
             critical.append("STRIPE_WEBHOOK_SECRET required when Stripe is configured in production")
+        if settings.stripe_connect_za_approved:
+            connect_urls = (
+                settings.stripe_connect_return_url or settings.public_base_url,
+                settings.stripe_connect_refresh_url or settings.public_base_url,
+            )
+            if any(not url.startswith("https://") for url in connect_urls):
+                critical.append("Stripe Connect callback URLs must use https:// in production")
         if not settings.twilio_account_sid or not settings.twilio_auth_token:
             warnings.append("Twilio unset — voice/WhatsApp webhooks will stay in mock mode")
         if settings.debug:

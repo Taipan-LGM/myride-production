@@ -42,6 +42,10 @@ class Settings(BaseSettings):
     stripe_live_secret_key: str = ""
     stripe_webhook_secret: str = ""
     stripe_currency: str = "zar"
+    stripe_connect_return_url: str = ""
+    stripe_connect_refresh_url: str = ""
+    stripe_connect_country: str = "ZA"
+    stripe_connect_za_approved: bool = False
 
     # Firestore / GCP
     google_application_credentials: str = ""
@@ -51,6 +55,15 @@ class Settings(BaseSettings):
 
     # Redis
     redis_url: str = "redis://localhost:6379/0"
+
+    # Cartrack fleet telemetry (server-side admin overlay only)
+    cartrack_enabled: bool = False
+    cartrack_base_url: str = "https://fleetapi-za.cartrack.com/rest"
+    cartrack_username: str = ""
+    cartrack_api_key: str = ""
+
+    # Driver remuneration (snapshotted onto each trip at creation)
+    default_driver_share_bps: int = Field(default=8500, ge=0, le=10000)
 
     # Geofire defaults (km)
     driver_search_radius_km: float = 5.0

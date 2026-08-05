@@ -26,6 +26,7 @@ from app.auth import (
     require_role,
 )
 from app.channels import channel_directory, simulate_channel_booking
+from app.cartrack_service import CartrackNotConfigured, CartrackUpstreamError, close_cartrack, get_cartrack
 from app.config import Settings, get_settings
 from app.geocode_osm import resolve_address, reverse_geocode, search_places
 from app.firestore_db import FirestoreDB, get_db
@@ -48,6 +49,8 @@ from app.models import (
     PaymentHoldRequest,
     PaymentTransferRequest,
     RateTripRequest,
+    RefundTripRequest,
+    RemunerationPolicyUpdate,
     ScheduleRideRequest,
     TripAssignRequest,
     TripCreateRequest,
@@ -56,7 +59,8 @@ from app.models import (
     WebSocketEvent,
 )
 from app.offer_stream import create_trip_and_offer
-from app.reconciliation import get_reconciliation
+from app.reconciliation import ReconciliationNotReady, get_reconciliation
+from app.refunds import RefundInProgress, RefundNotReady, get_refund_service
 from app.redis_cache import RedisCache, get_cache
 from app.seed import seed_demo_data
 from app.stripe_service import get_stripe
@@ -110,6 +114,7 @@ async def lifespan(app: FastAPI):
     app.state.db = db
     app.state.cache = cache
     yield
+    await close_cartrack()
     await cache.close()
     await db.close()
     await close_postgres()
@@ -545,6 +550,36 @@ async def admin_metrics(
     return await collect_admin_metrics(db)
 
 
+@app.get("/admin/fleet/vehicles")
+async def admin_fleet_vehicles(
+    _admin: AuthUser = Depends(require_role("admin")),
+    cartrack=Depends(get_cartrack),
+):
+    try:
+        return await cartrack.list_vehicles()
+    except CartrackNotConfigured as error:
+        raise HTTPException(503, str(error)) from error
+    except CartrackUpstreamError as error:
+        raise HTTPException(502, str(error)) from error
+
+
+@app.get("/admin/settings/remuneration")
+async def get_remuneration_settings(
+    db: FirestoreDB = Depends(db_dep),
+    _admin: AuthUser = Depends(require_role("admin")),
+):
+    return await db.get_remuneration_policy()
+
+
+@app.patch("/admin/settings/remuneration")
+async def update_remuneration_settings(
+    body: RemunerationPolicyUpdate,
+    db: FirestoreDB = Depends(db_dep),
+    admin: AuthUser = Depends(require_role("admin")),
+):
+    return await db.update_remuneration_policy(body.driver_share_bps, admin.id)
+
+
 @app.post("/payments/reconcile/{trip_id}")
 async def reconcile_payment(
     trip_id: str,
@@ -553,14 +588,60 @@ async def reconcile_payment(
 ):
     try:
         record = await get_reconciliation().reconcile_trip(db, trip_id)
+    except ReconciliationNotReady as exc:
+        raise HTTPException(409, str(exc)) from exc
     except ValueError as exc:
         raise HTTPException(404, str(exc)) from exc
     return record.to_dict()
 
 
 @app.get("/payments/ledger")
-async def payment_ledger(_admin: AuthUser = Depends(require_role("admin"))):
-    return {"items": get_reconciliation().list_ledger()}
+async def payment_ledger(
+    db: FirestoreDB = Depends(db_dep),
+    _admin: AuthUser = Depends(require_role("admin")),
+):
+    return {"items": await db.list_payment_records()}
+
+
+@app.post("/payments/refund/{trip_id}")
+async def refund_trip(
+    trip_id: str,
+    body: RefundTripRequest,
+    db: FirestoreDB = Depends(db_dep),
+    admin: AuthUser = Depends(require_role("admin")),
+):
+    try:
+        return await get_refund_service().refund_trip(db, trip_id, admin.id, body.reason)
+    except RefundInProgress as exc:
+        raise HTTPException(409, str(exc)) from exc
+    except RefundNotReady as exc:
+        raise HTTPException(409, str(exc)) from exc
+    except ValueError as exc:
+        raise HTTPException(404, str(exc)) from exc
+
+
+@app.get("/admin/reconciliations")
+async def reconciliation_queue(
+    limit: int = 50,
+    db: FirestoreDB = Depends(db_dep),
+    _admin: AuthUser = Depends(require_role("admin")),
+):
+    bounded_limit = max(1, min(limit, 100))
+    items = await db.list_reconciliation_trips(bounded_limit)
+    return {
+        "items": [
+            {
+                "trip_id": trip.id,
+                "driver_id": trip.driver_id,
+                "fare_cents": int(trip.fare_final_cents or trip.fare_estimate_cents or 0),
+                "status": trip.reconciliation_status or "pending",
+                "attempt_count": trip.reconciliation_attempt_count,
+                "attempted_at": trip.reconciliation_attempted_at,
+                "error": trip.reconciliation_error,
+            }
+            for trip in items
+        ]
+    }
 
 
 @app.post("/riders")
@@ -594,6 +675,55 @@ async def update_driver_location(
         raise HTTPException(404, "Driver not found")
     await cache.set_json(f"driver:{body.driver_id}:location", driver.model_dump(mode="json"))
     return driver
+
+
+@app.get("/drivers/me/stripe-connect")
+async def driver_stripe_connect_status(
+    db: FirestoreDB = Depends(db_dep),
+    driver: AuthUser = Depends(require_role("driver")),
+    stripe=Depends(get_stripe),
+):
+    if not stripe.connect_available:
+        raise HTTPException(503, "Stripe Connect for South Africa is awaiting provider approval")
+    profile = await db.get_driver(driver.id)
+    if not profile or not profile.stripe_account_id:
+        return {"status": "not_started", "account_id": None, "payouts_enabled": False}
+    details = await stripe.get_connect_account_status(profile.stripe_account_id)
+    status = "ready" if details["payouts_enabled"] else "pending"
+    return {"status": status, "account_id": profile.stripe_account_id, **details}
+
+
+@app.post("/drivers/me/stripe-connect/onboarding")
+async def driver_stripe_connect_onboarding(
+    db: FirestoreDB = Depends(db_dep),
+    driver: AuthUser = Depends(require_role("driver")),
+    stripe=Depends(get_stripe),
+):
+    if not stripe.connect_available:
+        raise HTTPException(503, "Stripe Connect for South Africa is awaiting provider approval")
+    profile = await db.get_driver(driver.id)
+    if not profile:
+        profile = await db.create_driver(
+            {"id": driver.id, "name": driver.name, "phone": driver.phone, "email": driver.email}
+        )
+    if not profile.stripe_account_id:
+        account = await stripe.create_connect_account(driver.id, driver.email)
+        profile = await db.attach_driver_stripe_account(driver.id, account["id"])
+    if not profile or not profile.stripe_account_id:
+        raise HTTPException(409, "Unable to attach driver payout account")
+    details = await stripe.get_connect_account_status(profile.stripe_account_id)
+    status = "ready" if details["payouts_enabled"] else "pending"
+    if details["payouts_enabled"]:
+        link = await stripe.create_connect_login_link(profile.stripe_account_id)
+    else:
+        link = await stripe.create_connect_account_link(profile.stripe_account_id)
+    return {
+        "status": status,
+        "account_id": profile.stripe_account_id,
+        "onboarding_url": link.get("url"),
+        "expires_at": link.get("expires_at"),
+        **details,
+    }
 
 
 @app.post("/drivers/nearby")
@@ -659,6 +789,8 @@ async def update_trip_status(
     db: FirestoreDB = Depends(db_dep),
     user: AuthUser = Depends(require_role("driver", "rider", "admin")),
 ):
+    if status == TripStatus.completed:
+        raise HTTPException(409, "Use the complete-ride workflow to capture payment and reconcile payout")
     existing = await db.get_trip(trip_id)
     if not existing:
         raise HTTPException(404, "Trip not found")
@@ -680,14 +812,24 @@ async def payment_hold(
     user: AuthUser = Depends(require_role("rider", "admin")),
 ):
     assert_self_or_admin(user, body.rider_id, label="rider")
+    trip = await db.get_trip(body.trip_id)
+    if not trip:
+        raise HTTPException(404, "Trip not found")
+    if trip.rider_id != body.rider_id:
+        raise HTTPException(409, "Payment rider does not match trip")
+    expected_amount = int(trip.fare_final_cents or trip.fare_estimate_cents or 0)
+    if expected_amount and body.amount_cents != expected_amount:
+        raise HTTPException(409, "Payment amount must match the trip fare")
+    if body.currency.lower() != trip.currency.lower():
+        raise HTTPException(409, "Payment currency must match the trip currency")
+    if trip.payment_status != "pending":
+        raise HTTPException(409, "Trip payment has already been initialized")
     stripe = get_stripe()
     result = await stripe.create_hold(body.amount_cents, body.rider_id, body.trip_id, body.currency)
-    trip = await db.get_trip(body.trip_id)
-    if trip:
-        await db.update_trip(
-            body.trip_id,
-            {"payment_intent_id": result["id"], "payment_status": "authorized"},
-        )
+    await db.update_trip(
+        body.trip_id,
+        {"payment_intent_id": result["id"], "payment_status": "authorized"},
+    )
     return result
 
 
@@ -697,11 +839,27 @@ async def payment_capture(
     db: FirestoreDB = Depends(db_dep),
     user: AuthUser = Depends(require_role("driver", "admin")),
 ):
-    _ = user
+    trip = await db.get_trip(body.trip_id)
+    if not trip:
+        raise HTTPException(404, "Trip not found")
+    if user.role == "driver" and trip.driver_id != user.id:
+        raise HTTPException(403, "Not assigned to this trip")
+    if trip.payment_intent_id != body.payment_intent_id:
+        raise HTTPException(409, "Payment reference does not match trip")
+    if trip.payment_status != "authorized":
+        raise HTTPException(409, "Trip payment is not authorized")
+    expected_amount = int(trip.fare_final_cents or trip.fare_estimate_cents or 0)
+    capture_amount = body.amount_cents if body.amount_cents is not None else expected_amount
+    if capture_amount != expected_amount:
+        raise HTTPException(409, "Capture amount must match the trip fare")
     stripe = get_stripe()
-    result = await stripe.capture(body.payment_intent_id, body.amount_cents)
-    if await db.get_trip(body.trip_id):
-        await db.update_trip(body.trip_id, {"payment_status": "captured"})
+    result = await stripe.capture(body.payment_intent_id, capture_amount, trip.id)
+    if result.get("status") != "succeeded":
+        raise HTTPException(409, "Trip payment capture is not complete")
+    await db.update_trip(
+        body.trip_id,
+        {"payment_status": "captured", "captured_amount_cents": capture_amount},
+    )
     return result
 
 
@@ -710,15 +868,11 @@ async def payment_transfer(
     body: PaymentTransferRequest,
     _admin: AuthUser = Depends(require_role("admin")),
 ):
-    return await get_stripe().transfer_to_driver(
-        body.amount_cents,
-        body.driver_stripe_account_id,
-        body.trip_id,
-    )
+    raise HTTPException(410, "Direct transfers are disabled; use payout reconciliation")
 
 
 @app.post("/webhooks/stripe")
-async def stripe_webhook(request: Request):
+async def stripe_webhook(request: Request, db: FirestoreDB = Depends(db_dep)):
     from app.webhooks_security import verify_stripe_webhook
 
     payload = await request.body()
@@ -726,7 +880,19 @@ async def stripe_webhook(request: Request):
     event = verify_stripe_webhook(payload, sig)
     event_type = event.get("type") if isinstance(event, dict) else getattr(event, "type", "?")
     logger.info("Stripe webhook: %s", event_type)
-    # Idempotent ack — payment state is driven by capture/reconcile paths
+    if event_type == "refund.updated":
+        data = event.get("data", {}) if isinstance(event, dict) else getattr(event, "data", {})
+        refund = data.get("object", {}) if isinstance(data, dict) else getattr(data, "object", {})
+        get_value = refund.get if isinstance(refund, dict) else lambda key, default=None: getattr(refund, key, default)
+        metadata = get_value("metadata", {}) or {}
+        trip_id = metadata.get("trip_id") if isinstance(metadata, dict) else getattr(metadata, "trip_id", None)
+        if trip_id and get_value("status") == "succeeded":
+            await get_refund_service().finalize_refund(
+                db,
+                str(trip_id),
+                str(get_value("id")),
+                int(get_value("amount", 0)),
+            )
     return {"received": True, "type": event_type}
 
 

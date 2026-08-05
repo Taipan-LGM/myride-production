@@ -8,6 +8,7 @@ from typing import Any
 
 from app.firestore_db import FirestoreDB
 from app.models import TripStatus
+from app.reconciliation import calculate_fare_split
 
 
 @dataclass
@@ -104,15 +105,29 @@ async def predictive_suggestions(user_id: str, db: FirestoreDB | None = None) ->
 
 async def driver_daily_insights(driver_id: str, db: FirestoreDB) -> dict[str, Any]:
     trips = await db.list_trips(driver_id=driver_id, limit=50)
-    completed = [t for t in trips if t.status == TripStatus.completed]
-    earnings_cents = sum(int(t.fare_final_cents or t.fare_estimate_cents or 0) for t in completed)
+    completed = [
+        t
+        for t in trips
+        if t.status == TripStatus.completed
+        and t.reconciliation_status == "reconciled"
+        and t.payment_status != "refunded"
+    ]
+    earnings_cents = sum(
+        int(t.driver_payout_cents)
+        if t.driver_payout_cents is not None
+        else calculate_fare_split(
+            int(t.fare_final_cents or t.fare_estimate_cents or 0),
+            t.driver_share_bps if t.driver_share_bps is not None else db.settings.default_driver_share_bps,
+        )[0]
+        for t in completed
+    )
     earnings = earnings_cents / 100.0
     avg = (earnings / len(completed)) if completed else 0.0
     insight = DriverInsight(
         driver_id=driver_id,
         headline=f"You earned R{earnings:.2f} across {len(completed)} completed trips",
         bullets=[
-            f"Average fare R{avg:.2f}",
+            f"Average payout R{avg:.2f}",
             "Acceptance tip: stay online near CBD 07:00–09:00 for higher match scores",
             "Passengers rate clean cars higher — keep 5★ streak",
             "Try East side / airport corridor 16:00–19:00 — high demand",

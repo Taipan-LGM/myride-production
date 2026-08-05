@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from app.firestore_db import FirestoreDB
 from app.models import GeoPoint
+from app.reconciliation import get_reconciliation
 
 
 async def seed_demo_data(db: FirestoreDB) -> dict[str, list[str]]:
@@ -76,8 +77,28 @@ async def seed_demo_data(db: FirestoreDB) -> dict[str, list[str]]:
             "currency": "zar",
         }
     )
+    payment_trip = await db.create_trip(
+        {
+            "id": "trip-payment-demo-001",
+            "rider_id": rider.id,
+            "driver_id": driver_ids[0],
+            "pickup": GeoPoint(lat=-33.9249, lng=18.4241).model_dump(),
+            "dropoff": GeoPoint(lat=-33.9180, lng=18.4232).model_dump(),
+            "pickup_address": "Cape Town CBD",
+            "dropoff_address": "V&A Waterfront",
+            "fare_estimate_cents": 10000,
+            "fare_final_cents": 10000,
+            "driver_share_bps": 8500,
+            "currency": "zar",
+            "status": "completed",
+            "payment_intent_id": "pi_dev_payment_demo_001",
+            "payment_status": "captured",
+            "captured_amount_cents": 10000,
+        }
+    )
+    await get_reconciliation().reconcile_trip(db, payment_trip.id)
     return {
         "riders": [rider.id],
         "drivers": driver_ids,
-        "trips": [trip.id],
+        "trips": [trip.id, payment_trip.id],
     }

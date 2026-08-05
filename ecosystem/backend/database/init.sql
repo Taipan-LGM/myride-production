@@ -58,13 +58,18 @@ CREATE TABLE IF NOT EXISTS ride_events (
 
 CREATE TABLE IF NOT EXISTS payment_ledger (
     id BIGSERIAL PRIMARY KEY,
+    idempotency_key TEXT,
     trip_external_id TEXT,
     amount_cents INT NOT NULL,
     kind VARCHAR(40) NOT NULL,
     status VARCHAR(40) NOT NULL,
     external_ref TEXT,
+    record JSONB,
     created_at TIMESTAMPTZ DEFAULT NOW()
 );
+
+ALTER TABLE payment_ledger ADD COLUMN IF NOT EXISTS idempotency_key TEXT;
+ALTER TABLE payment_ledger ADD COLUMN IF NOT EXISTS record JSONB;
 
 CREATE TABLE IF NOT EXISTS driver_locations (
     driver_external_id TEXT PRIMARY KEY,
@@ -74,9 +79,16 @@ CREATE TABLE IF NOT EXISTS driver_locations (
     updated_at TIMESTAMPTZ DEFAULT NOW()
 );
 
+CREATE TABLE IF NOT EXISTS platform_settings (
+    setting_key TEXT PRIMARY KEY,
+    value JSONB NOT NULL,
+    updated_at TIMESTAMPTZ DEFAULT NOW()
+);
+
 CREATE INDEX IF NOT EXISTS idx_rides_passenger ON rides(passenger_id, requested_at DESC);
 CREATE INDEX IF NOT EXISTS idx_rides_driver ON rides(driver_id, requested_at DESC);
 CREATE INDEX IF NOT EXISTS idx_rides_status ON rides(status);
 CREATE INDEX IF NOT EXISTS idx_ride_events_rider ON ride_events(rider_external_id, created_at DESC);
 CREATE INDEX IF NOT EXISTS idx_ride_events_status ON ride_events(status);
 CREATE INDEX IF NOT EXISTS idx_payment_ledger_trip ON payment_ledger(trip_external_id);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_payment_ledger_idempotency ON payment_ledger(idempotency_key) WHERE idempotency_key IS NOT NULL;

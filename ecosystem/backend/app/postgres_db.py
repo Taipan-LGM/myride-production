@@ -19,6 +19,18 @@ _status = "disabled"
 _primary = False
 
 
+def _json_object(value: Any) -> dict[str, Any] | None:
+    if isinstance(value, dict):
+        return dict(value)
+    if isinstance(value, str):
+        try:
+            decoded = json.loads(value)
+        except json.JSONDecodeError:
+            return None
+        return decoded if isinstance(decoded, dict) else None
+    return None
+
+
 def postgres_status() -> str:
     if _status == "connected" and _primary:
         return "primary"
@@ -58,7 +70,12 @@ async def connect_postgres(settings: Settings | None = None) -> None:
         logger.info("Postgres connected (%s)", mode)
         from app.schema_migrate import apply_schema
 
-        await apply_schema(_pool)
+        if not await apply_schema(_pool):
+            await _pool.close()
+            _pool = None
+            _status = "schema-error"
+            _primary = False
+            logger.error("Postgres disabled because required schema migration failed")
     except Exception as exc:
         _pool = None
         _status = "error"
@@ -269,28 +286,249 @@ async def list_trips(
     return out
 
 
-async def mirror_payment(
-    *,
+async def list_reconciliation_trips(limit: int = 50) -> list[dict[str, Any]]:
+    if _pool is None:
+        return []
+    async with _pool.acquire() as conn:
+        rows = await conn.fetch(
+            """
+            SELECT * FROM ride_events
+            WHERE status = 'completed'
+              AND payment_status = 'captured'
+              AND COALESCE(raw ->> 'reconciliation_status', 'pending') <> 'reconciled'
+            ORDER BY COALESCE(
+                (raw ->> 'reconciliation_attempted_at')::timestamptz,
+                updated_at,
+                created_at
+            ) DESC
+            LIMIT $1
+            """,
+            limit,
+        )
+    return [item for row in rows if (item := _row_to_trip_dict(row)) is not None]
+
+
+async def claim_reconciliation_attempt(
     trip_id: str,
-    amount_cents: int,
-    kind: str,
-    status: str,
-    external_ref: str | None = None,
-) -> None:
+    attempted_at: str,
+    stale_before: str,
+) -> dict[str, Any] | None:
+    if _pool is None:
+        return None
+    async with _pool.acquire() as conn:
+        row = await conn.fetchrow(
+            """
+            UPDATE ride_events
+            SET raw = COALESCE(raw, '{}'::jsonb) || jsonb_build_object(
+                    'reconciliation_status', 'pending',
+                    'reconciliation_attempt_count', COALESCE((raw ->> 'reconciliation_attempt_count')::integer, 0) + 1,
+                    'reconciliation_attempted_at', $2::text,
+                    'reconciliation_error', NULL,
+                    'updated_at', $2::text
+                ),
+                updated_at = NOW()
+            WHERE external_id = $1
+              AND status = 'completed'
+              AND payment_status = 'captured'
+              AND COALESCE(raw ->> 'reconciliation_status', 'pending') <> 'reconciled'
+              AND (
+                  raw ->> 'reconciliation_status' <> 'pending'
+                  OR raw ->> 'reconciliation_attempted_at' IS NULL
+                  OR (raw ->> 'reconciliation_attempted_at')::timestamptz < $3::timestamptz
+              )
+            RETURNING *
+            """,
+            trip_id,
+            attempted_at,
+            stale_before,
+        )
+    return _row_to_trip_dict(row)
+
+
+async def claim_refund_attempt(trip_id: str, attempted_at: str, stale_before: str) -> dict[str, Any] | None:
+    if _pool is None:
+        return None
+    async with _pool.acquire() as conn:
+        row = await conn.fetchrow(
+            """
+            UPDATE ride_events
+            SET raw = COALESCE(raw, '{}'::jsonb) || jsonb_build_object(
+                    'refund_status', 'pending',
+                    'refund_attempt_count', COALESCE((raw ->> 'refund_attempt_count')::integer, 0) + 1,
+                    'refund_attempted_at', $2::text,
+                    'refund_error', NULL,
+                    'updated_at', $2::text
+                ),
+                updated_at = NOW()
+            WHERE external_id = $1
+              AND payment_status IN ('captured', 'refunded')
+              AND COALESCE(raw ->> 'refund_status', 'none') <> 'refunded'
+              AND (
+                  raw ->> 'refund_status' <> 'pending'
+                  OR raw ->> 'refund_attempted_at' IS NULL
+                  OR (raw ->> 'refund_attempted_at')::timestamptz < $3::timestamptz
+              )
+            RETURNING *
+            """,
+            trip_id,
+            attempted_at,
+            stale_before,
+        )
+    return _row_to_trip_dict(row)
+
+
+async def driver_earnings_rows(driver_id: str) -> list[dict[str, Any]]:
+    """Return uncapped persisted payout snapshots for one driver."""
+    if _pool is None:
+        return []
+    async with _pool.acquire() as conn:
+        rows = await conn.fetch(
+            """
+            SELECT raw
+            FROM ride_events
+            WHERE driver_external_id = $1
+              AND status = 'completed'
+              AND raw ->> 'reconciliation_status' = 'reconciled'
+            ORDER BY updated_at DESC NULLS LAST, created_at DESC
+            """,
+            driver_id,
+        )
+    return [decoded for row in rows if (decoded := _json_object(row["raw"])) is not None]
+
+
+async def get_platform_setting(setting_key: str) -> dict[str, Any] | None:
+    if _pool is None:
+        return None
+    async with _pool.acquire() as conn:
+        value = await conn.fetchval(
+            "SELECT value FROM platform_settings WHERE setting_key = $1",
+            setting_key,
+        )
+    return _json_object(value)
+
+
+async def set_platform_setting(setting_key: str, value: dict[str, Any]) -> None:
     if _pool is None:
         return
-    try:
-        async with _pool.acquire() as conn:
-            await conn.execute(
-                """
-                INSERT INTO payment_ledger (trip_external_id, amount_cents, kind, status, external_ref)
-                VALUES ($1, $2, $3, $4, $5)
-                """,
-                trip_id,
-                amount_cents,
-                kind,
-                status,
-                external_ref,
-            )
-    except Exception as exc:
-        logger.debug("Postgres payment mirror skipped: %s", exc)
+    payload = json.dumps(value, default=str)
+    async with _pool.acquire() as conn:
+        await conn.execute(
+            """
+            INSERT INTO platform_settings (setting_key, value, updated_at)
+            VALUES ($1, $2::jsonb, NOW())
+            ON CONFLICT (setting_key) DO UPDATE
+            SET value = EXCLUDED.value, updated_at = NOW()
+            """,
+            setting_key,
+            payload,
+        )
+
+
+async def update_remuneration_setting(fields: dict[str, Any]) -> dict[str, Any]:
+    """Atomically allocate the next remuneration policy version."""
+    policy = {"version": 2, **fields}
+    if _pool is None:
+        return policy
+    payload = json.dumps(policy, default=str)
+    async with _pool.acquire() as conn:
+        value = await conn.fetchval(
+            """
+            INSERT INTO platform_settings (setting_key, value, updated_at)
+            VALUES ('remuneration', $1::jsonb, NOW())
+            ON CONFLICT (setting_key) DO UPDATE
+            SET value = EXCLUDED.value || jsonb_build_object(
+                    'version', COALESCE((platform_settings.value ->> 'version')::integer, 1) + 1
+                ),
+                updated_at = NOW()
+            RETURNING value
+            """,
+            payload,
+        )
+    return _json_object(value) or policy
+
+
+async def get_payment_record(idempotency_key: str) -> dict[str, Any] | None:
+    if _pool is None:
+        return None
+    async with _pool.acquire() as conn:
+        value = await conn.fetchval(
+            "SELECT record FROM payment_ledger WHERE idempotency_key = $1",
+            idempotency_key,
+        )
+    return _json_object(value)
+
+
+async def create_or_get_payment_record(
+    idempotency_key: str,
+    record: dict[str, Any],
+    kind: str = "reconciliation",
+) -> dict[str, Any]:
+    if _pool is None:
+        return record
+    payload = json.dumps(record, default=str)
+    async with _pool.acquire() as conn:
+        value = await conn.fetchval(
+            """
+            INSERT INTO payment_ledger (
+                idempotency_key, trip_external_id, amount_cents, kind, status, external_ref, record
+            ) VALUES ($1, $2, $3, $4, $5, $6, $7::jsonb)
+            ON CONFLICT (idempotency_key) WHERE idempotency_key IS NOT NULL DO UPDATE
+            SET idempotency_key = payment_ledger.idempotency_key
+            RETURNING record
+            """,
+            idempotency_key,
+            record["trip_id"],
+            record["amount_cents"],
+            kind,
+            record["status"],
+            record.get("refund_id") or record.get("transfer_id"),
+            payload,
+        )
+    return _json_object(value) or record
+
+
+async def list_payment_records(limit: int = 50) -> list[dict[str, Any]]:
+    if _pool is None:
+        return []
+    async with _pool.acquire() as conn:
+        rows = await conn.fetch(
+            """
+            SELECT record FROM payment_ledger
+            WHERE record IS NOT NULL
+            ORDER BY created_at DESC
+            LIMIT $1
+            """,
+            limit,
+        )
+    return [decoded for row in rows if (decoded := _json_object(row["record"])) is not None]
+
+
+async def list_payment_records_since(since: datetime) -> list[dict[str, Any]]:
+    if _pool is None:
+        return []
+    async with _pool.acquire() as conn:
+        rows = await conn.fetch(
+            """
+            SELECT COALESCE(
+                ledger.record,
+                jsonb_build_object(
+                    'trip_id', ledger.trip_external_id,
+                    'amount_cents', ledger.amount_cents,
+                    'driver_payout_cents', COALESCE((event.raw ->> 'driver_payout_cents')::integer, 0),
+                    'platform_fee_cents', COALESCE((event.raw ->> 'platform_fee_cents')::integer, 0),
+                    'status', ledger.status,
+                    'reconciled_at', ledger.created_at
+                )
+            ) AS record
+            FROM payment_ledger AS ledger
+            LEFT JOIN ride_events AS event ON event.external_id = ledger.trip_external_id
+            WHERE COALESCE(
+                NULLIF(ledger.record ->> 'reconciled_at', '')::timestamptz,
+                NULLIF(ledger.record ->> 'refunded_at', '')::timestamptz,
+                ledger.created_at
+            ) >= $1
+            ORDER BY ledger.created_at DESC
+            """,
+            since,
+        )
+    return [decoded for row in rows if (decoded := _json_object(row["record"])) is not None]

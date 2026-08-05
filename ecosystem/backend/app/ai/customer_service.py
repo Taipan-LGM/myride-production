@@ -248,7 +248,7 @@ class CustomerServiceAI:
             )
         return SupportResolution(
             category=category,
-            message=f"I've processed a refund of R{amount:.2f}. It should appear in 3–5 business days.",
+            message=f"Your R{amount:.2f} refund request is eligible and ready for secure payment review.",
             action=ResolutionAction.PROCESS_REFUND,
             action_params={
                 "trip_id": trip_id,
@@ -330,11 +330,11 @@ class CustomerServiceAI:
         resolution: SupportResolution,
         user_id: str,
     ) -> SupportResolution:
-        # Structured actions for routes to execute; mark stub results.
+        executed = resolution.action != ResolutionAction.PROCESS_REFUND
         resolution.action_params = {
             **resolution.action_params,
             "user_id": user_id,
-            "executed": True,
-            "executor": "customer_service_ai",
+            "executed": executed,
+            "executor": "customer_service_ai" if executed else "refund_service_required",
         }
         return resolution

@@ -30,6 +30,14 @@ class PaymentStatus(str, Enum):
     failed = "failed"
 
 
+class RemunerationPolicyUpdate(BaseModel):
+    driver_share_bps: int = Field(..., ge=0, le=10000)
+
+
+class RefundTripRequest(BaseModel):
+    reason: str = Field(default="requested_by_customer", min_length=3, max_length=200)
+
+
 class GeoPoint(BaseModel):
     lat: float = Field(..., ge=-90, le=90)
     lng: float = Field(..., ge=-180, le=180)
@@ -51,6 +59,7 @@ class DriverProfile(BaseModel):
     vehicle_make: str | None = None
     vehicle_model: str | None = None
     vehicle_plate: str | None = None
+    stripe_account_id: str | None = None
     location: GeoPoint | None = None
     geohash: str | None = None
     is_online: bool = False
@@ -71,9 +80,28 @@ class Trip(BaseModel):
     dropoff_address: str | None = None
     fare_estimate_cents: int | None = None
     fare_final_cents: int | None = None
+    driver_share_bps: int | None = Field(default=None, ge=0, le=10000)
+    remuneration_policy_version: int | None = Field(default=None, ge=1)
+    driver_payout_cents: int | None = Field(default=None, ge=0)
+    platform_fee_cents: int | None = Field(default=None, ge=0)
+    reconciliation_status: str | None = None
+    reconciliation_attempt_count: int = Field(default=0, ge=0)
+    reconciliation_attempted_at: datetime | None = None
+    reconciliation_error: str | None = None
+    transfer_id: str | None = None
+    reconciled_at: datetime | None = None
+    refund_status: str | None = None
+    refund_attempt_count: int = Field(default=0, ge=0)
+    refund_attempted_at: datetime | None = None
+    refund_error: str | None = None
+    refund_id: str | None = None
+    transfer_reversal_id: str | None = None
+    refunded_amount_cents: int | None = Field(default=None, ge=0)
+    refunded_at: datetime | None = None
     currency: str = "zar"
     payment_intent_id: str | None = None
     payment_status: PaymentStatus = PaymentStatus.pending
+    captured_amount_cents: int | None = Field(default=None, ge=0)
     booking_channel: str | None = None
     created_at: datetime | None = None
     updated_at: datetime | None = None

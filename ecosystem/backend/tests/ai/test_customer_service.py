@@ -40,6 +40,8 @@ async def test_refund_under_cap_processes(cs: CustomerServiceAI):
     assert result.category in (IssueCategory.REFUND, IssueCategory.PAYMENT)
     assert result.action == ResolutionAction.PROCESS_REFUND
     assert result.needs_human is False
+    assert result.action_params["executed"] is False
+    assert "eligible" in result.message
 
 
 @pytest.mark.asyncio

@@ -13,7 +13,6 @@ from app.rider_services import (
     award_loyalty_for_trip,
     carbon_for_distance_km,
     charge_wallet,
-    driver_earnings_summary,
     get_loyalty,
     get_wallet,
     list_saved_places,
@@ -216,17 +215,21 @@ async def carbon_estimate(body: CarbonRequest):
 
 
 @router.get("/driver/earnings")
-async def earnings_me(user: AuthUser = Depends(require_role("driver", "admin"))):
-    return driver_earnings_summary(user.id)
+async def earnings_me(
+    user: AuthUser = Depends(require_role("driver", "admin")),
+    db: FirestoreDB = Depends(get_db),
+):
+    return await db.driver_earnings_summary(user.id)
 
 
 @router.get("/driver/earnings/{driver_id}")
 async def earnings_for(
     driver_id: str,
     user: AuthUser = Depends(require_role("driver", "admin")),
+    db: FirestoreDB = Depends(get_db),
 ):
     assert_self_or_admin(user, driver_id, label="driver")
-    return driver_earnings_summary(driver_id)
+    return await db.driver_earnings_summary(driver_id)
 
 
 # Re-export for complete_ride hooks

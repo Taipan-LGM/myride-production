@@ -10,10 +10,8 @@ from app.rider_services import (
     award_loyalty_for_trip,
     carbon_for_distance_km,
     charge_wallet,
-    driver_earnings_summary,
     get_loyalty,
     get_wallet,
-    record_driver_earning,
     save_place,
     top_up_wallet,
 )
@@ -94,7 +92,7 @@ def test_carbon_unit():
     assert c["co2_g"] == 900
 
 
-def test_wallet_charge_and_earnings():
+def test_wallet_charge_and_loyalty():
     uid = "unit-rider-wallet"
     top_up_wallet(uid, 10_000)
     w = charge_wallet(uid, 2500)
@@ -102,12 +100,6 @@ def test_wallet_charge_and_earnings():
     loy = award_loyalty_for_trip(uid, 8500)
     assert loy["earned_this_trip"] == 85
     assert get_loyalty(uid)["points"] >= 85
-
-    did = "unit-driver-earn"
-    record_driver_earning(did, trip_id="t1", amount_cents=6800, fare_cents=8500)
-    summary = driver_earnings_summary(did)
-    assert summary["total_cents"] == 6800
-    assert summary["trips"] == 1
 
     place = save_place(uid, {"kind": "work", "label": "Office", "lat": -26.1, "lng": 28.0})
     assert place["kind"] == "work"
@@ -129,6 +121,7 @@ async def test_fare_estimate_includes_carbon():
             },
         )
         assert r.status_code == 200
+        assert r.json()["currency"] == "zar"
         data = r.json()
         assert "carbon" in data
         assert data["carbon"]["co2_kg"] >= 0
@@ -148,4 +141,49 @@ async def test_driver_earnings_auth():
             headers={"Authorization": f"Bearer {token}"},
         )
         assert r.status_code == 200
-        assert r.json()["currency"] == "zar"
+
+
+@pytest.mark.asyncio
+async def test_driver_earnings_use_persisted_mixed_policy_snapshots():
+    from app.firestore_db import FirestoreDB
+
+    db = FirestoreDB()
+    await db.connect()
+    driver_id = "driver-durable-earnings"
+    common = {
+        "rider_id": "rider-durable-earnings",
+        "driver_id": driver_id,
+        "pickup": {"lat": -33.92, "lng": 18.42},
+        "dropoff": {"lat": -33.91, "lng": 18.41},
+        "status": "completed",
+        "reconciliation_status": "reconciled",
+        "reconciled_at": "2026-08-05T10:00:00+00:00",
+    }
+    await db.create_trip({
+        **common,
+        "id": "trip-durable-80",
+        "fare_final_cents": 10000,
+        "driver_share_bps": 8000,
+        "driver_payout_cents": 8000,
+        "platform_fee_cents": 2000,
+    })
+    await db.create_trip({
+        **common,
+        "id": "trip-durable-85",
+        "fare_final_cents": 20000,
+        "driver_share_bps": 8500,
+        "driver_payout_cents": 17000,
+        "platform_fee_cents": 3000,
+    })
+
+    summary = await db.driver_earnings_summary(driver_id)
+
+    assert summary["trips"] == 2
+    assert summary["total_cents"] == 25000
+    assert summary["gross_fare_cents"] == 30000
+    assert summary["platform_fee_cents"] == 5000
+    assert summary["driver_share_percent"] is None
+    assert summary["policy_breakdown"] == [
+        {"driver_share_bps": 8000, "driver_share_percent": 80.0, "trips": 1},
+        {"driver_share_bps": 8500, "driver_share_percent": 85.0, "trips": 1},
+    ]
