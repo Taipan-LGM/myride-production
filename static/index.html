@@ -1,0 +1,208 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>MyRide | Johannesburg</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Manrope:wght@600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+  <link rel="stylesheet" href="/static/ecosystem.css">
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <script src="https://unpkg.com/lucide@0.468.0/dist/umd/lucide.min.js"></script>
+  <style>
+    :root { --ink:#18211d; --muted:#68736d; --line:#dfe6e2; --paper:#f6f8f6; --white:#fff; --green:#0b7a4b; --lime:#b9f227; --yellow:#ffc846; --shadow:0 18px 48px rgba(22,38,30,.13); }
+    * { box-sizing:border-box; }
+    html, body { height:100%; }
+    body { margin:0; color:var(--ink); background:var(--paper); font-family:"DM Sans",sans-serif; letter-spacing:0; overflow:hidden; }
+    button,input { font:inherit; }
+    button { cursor:pointer; }
+    .shell { height:100vh; display:grid; grid-template-columns:420px 1fr; }
+    .sidebar { position:relative; z-index:500; height:100vh; padding:22px 24px 26px; background:var(--white); box-shadow:8px 0 32px rgba(23,40,31,.09); overflow:auto; }
+    .brandbar { display:flex; align-items:center; justify-content:space-between; margin-bottom:26px; }
+    .brand { display:flex; align-items:center; gap:10px; font:800 22px "Manrope",sans-serif; }
+    .logo { width:36px; height:36px; display:grid; place-items:center; border-radius:8px; background:var(--ink); color:var(--lime); }
+    .avatar { width:38px; height:38px; border:0; border-radius:50%; background:#e6f3ec; color:var(--green); font-weight:800; }
+    .eyebrow { margin:0 0 5px; color:var(--green); font-size:12px; font-weight:800; text-transform:uppercase; }
+    h1 { margin:0 0 5px; font:800 29px/1.15 "Manrope",sans-serif; }
+    .sub { margin:0 0 21px; color:var(--muted); font-size:14px; }
+    .route { position:relative; margin-bottom:16px; }
+    .route:before { content:""; position:absolute; left:18px; top:38px; height:37px; border-left:2px dotted #a8b3ad; z-index:2; }
+    .field { position:relative; display:flex; align-items:center; margin-bottom:9px; }
+    .dot { position:absolute; left:13px; z-index:3; width:11px; height:11px; border:3px solid var(--white); border-radius:50%; background:var(--green); box-shadow:0 0 0 1px var(--green); }
+    .dot.end { background:var(--ink); box-shadow:0 0 0 1px var(--ink); border-radius:2px; }
+    .field input { width:100%; height:52px; padding:0 42px 0 39px; border:1px solid var(--line); border-radius:7px; background:#f8faf8; outline:none; color:var(--ink); font-weight:600; }
+    .field input:focus { border-color:var(--green); box-shadow:0 0 0 3px rgba(11,122,75,.1); }
+    .locate { position:absolute; right:8px; width:34px; height:34px; border:0; background:transparent; color:var(--muted); font-size:19px; }
+    .quick { display:flex; gap:7px; margin-bottom:22px; }
+    .chip { padding:7px 11px; border:1px solid var(--line); border-radius:999px; background:var(--white); color:#48534d; font-size:12px; font-weight:700; }
+    .chip:hover { border-color:#aab8b0; }
+    .section-title { display:flex; justify-content:space-between; align-items:center; margin-bottom:10px; font:800 14px "Manrope",sans-serif; }
+    .eta { color:var(--muted); font:600 11px "DM Sans",sans-serif; }
+    .rides { display:grid; gap:7px; margin-bottom:20px; }
+    .ride { min-height:68px; display:grid; grid-template-columns:58px 1fr auto; align-items:center; gap:8px; padding:8px 12px 8px 8px; border:1px solid var(--line); border-radius:7px; background:var(--white); text-align:left; }
+    .ride.selected { border:2px solid var(--ink); padding:7px 11px 7px 7px; background:#f9fbf9; }
+    .car { width:52px; height:43px; display:grid; place-items:center; border-radius:6px; background:#eef3ef; font-size:27px; filter:grayscale(.2); }
+    .ride-name { display:block; font-weight:800; }
+    .ride-meta { color:var(--muted); font-size:12px; }
+    .price { font-weight:800; }
+    .payment { display:flex; align-items:center; justify-content:space-between; padding:13px 14px; border:1px solid var(--line); border-radius:7px; margin-bottom:13px; }
+    .payment strong { display:block; font-size:13px; }
+    .payment span { color:var(--muted); font-size:12px; }
+    .pay-icon { margin-right:9px; }
+    .change { border:0; background:transparent; color:var(--green); font-weight:800; font-size:12px; }
+    .book { width:100%; height:54px; border:0; border-radius:7px; background:var(--ink); color:var(--white); font-weight:800; box-shadow:0 8px 18px rgba(24,33,29,.16); }
+    .book:hover { background:#26342e; }
+    .book:disabled { cursor:wait; opacity:.7; }
+    .map-wrap { position:relative; min-width:0; }
+    #map { width:100%; height:100vh; background:#dfe8e1; }
+    .map-top { position:absolute; z-index:400; top:20px; left:20px; right:20px; display:flex; justify-content:space-between; pointer-events:none; }
+    .status,.safety { pointer-events:auto; display:flex; align-items:center; gap:8px; padding:10px 13px; border:1px solid rgba(255,255,255,.8); border-radius:7px; background:rgba(255,255,255,.93); box-shadow:0 6px 20px rgba(23,39,31,.12); font-size:12px; font-weight:700; backdrop-filter:blur(8px); }
+    .pulse { width:8px; height:8px; border-radius:50%; background:#21a663; box-shadow:0 0 0 5px rgba(33,166,99,.15); }
+    .safety { border:0; }
+    .driver-card { position:absolute; z-index:600; left:50%; bottom:24px; width:min(430px,calc(100% - 32px)); transform:translate(-50%,20px); visibility:hidden; opacity:0; padding:18px; border-radius:8px; background:var(--white); box-shadow:var(--shadow); transition:transform .45s ease,opacity .3s ease,visibility 0s .45s; }
+    .driver-card.show { transform:translate(-50%,0); visibility:visible; opacity:1; transition-delay:0s; }
+    .driver-head { display:flex; align-items:center; gap:12px; }
+    .driver-photo { width:48px; height:48px; display:grid; place-items:center; border-radius:50%; background:#d8eee2; font-size:24px; }
+    .driver-info { flex:1; }
+    .driver-info strong { display:block; }
+    .driver-info span { color:var(--muted); font-size:12px; }
+    .plate { padding:7px 9px; border:1px solid var(--line); border-radius:5px; font-weight:800; font-size:12px; }
+    .driver-progress { height:5px; margin-top:14px; overflow:hidden; border-radius:5px; background:#edf1ee; }
+    .driver-progress i { display:block; width:34%; height:100%; background:var(--green); animation:progress 8s linear forwards; }
+    .toast { position:absolute; z-index:700; top:22px; left:50%; transform:translate(-50%,-120px); padding:12px 18px; border-radius:7px; background:var(--ink); color:#fff; box-shadow:var(--shadow); font-size:13px; font-weight:700; transition:transform .3s ease; }
+    .toast.show { transform:translate(-50%,0); }
+    .leaflet-control-zoom { border:0!important; box-shadow:var(--shadow)!important; }
+    .leaflet-control-zoom a { color:var(--ink)!important; border:0!important; }
+    @keyframes progress { to { width:82%; } }
+    @media (max-width:760px) {
+      html, body { height:auto; min-height:100%; }
+      body { overflow:auto; }
+      .shell { height:auto; min-height:100vh; grid-template-columns:1fr; grid-template-rows:46vh auto; }
+      .map-wrap { grid-row:1; }
+      #map { height:46vh; }
+      .sidebar { grid-row:2; height:auto; min-height:54vh; padding:18px 18px 28px; overflow:visible; }
+      .brandbar { margin-bottom:16px; }
+      h1 { font-size:24px; }
+      .map-top { top:12px; left:12px; right:12px; }
+      .status { display:none; }
+      .driver-card { position:fixed; bottom:12px; }
+    }
+  </style>
+</head>
+<body>
+  <main class="shell">
+    <section class="sidebar" aria-label="Book a ride">
+      <div class="brandbar">
+        <div class="brand"><span class="logo">M</span> MyRide</div>
+        <button class="avatar" title="Account">TM</button>
+      </div>
+      <p class="eyebrow">Ride Johannesburg</p>
+      <h1>Where are you going?</h1>
+      <p class="sub">Reliable local rides, whenever you need one.</p>
+      <div class="route">
+        <label class="field"><span class="dot"></span><input id="pickup" value="Sandton City, Sandton" aria-label="Pickup location"><button class="locate" title="Use my location">⌖</button></label>
+        <label class="field"><span class="dot end"></span><input id="dropoff" value="Rosebank Mall, Rosebank" aria-label="Destination"></label>
+      </div>
+      <div class="quick">
+        <button class="chip" data-place="O.R. Tambo Airport">✈ Airport</button>
+        <button class="chip" data-place="Home, Johannesburg">⌂ Home</button>
+        <button class="chip" data-place="Melrose Arch">＋ Add stop</button>
+      </div>
+      <div class="section-title"><span>Choose a ride</span><span class="eta">Pickup in 3–6 min</span></div>
+      <div class="rides">
+        <button class="ride selected" data-name="MyRide Go" data-price="86"><span class="car">🚗</span><span><span class="ride-name">MyRide Go</span><span class="ride-meta">Affordable • 4 seats</span></span><span class="price">R86</span></button>
+        <button class="ride" data-name="Comfort" data-price="124"><span class="car">🚙</span><span><span class="ride-name">Comfort</span><span class="ride-meta">Extra space • Top drivers</span></span><span class="price">R124</span></button>
+        <button class="ride" data-name="XL" data-price="168"><span class="car">🚐</span><span><span class="ride-name">MyRide XL</span><span class="ride-meta">Groups • 6 seats</span></span><span class="price">R168</span></button>
+      </div>
+      <div class="payment"><div><span class="pay-icon">💵</span><strong style="display:inline">Cash</strong><span style="display:block;margin-left:29px">Pay after your trip</span></div><button class="change" id="payment">CHANGE</button></div>
+      <button class="book" id="book">Request MyRide Go • R86</button>
+    </section>
+    <section class="map-wrap" aria-label="Ride map">
+      <div id="map"></div>
+      <div class="map-top"><div class="status"><span class="pulse"></span> 124 drivers nearby</div><button class="safety">🛡 Safety centre</button></div>
+      <div class="toast" id="toast">Finding your nearest driver...</div>
+      <div class="driver-card" id="driver">
+        <div class="driver-head"><div class="driver-photo">👤</div><div class="driver-info"><strong>Your driver is being assigned</strong><span>Live trip updates will appear here</span></div><div class="plate">—</div></div>
+        <div class="driver-progress"><i></i></div>
+      </div>
+    </section>
+  </main>
+  <script>
+    const pickupCoords = [-26.1076, 28.0567];
+    const dropoffCoords = [-26.1458, 28.0418];
+    const map = L.map('map', { zoomControl:false }).setView([-26.126, 28.049], 14);
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { attribution:'&copy; OpenStreetMap contributors' }).addTo(map);
+    L.control.zoom({ position:'bottomright' }).addTo(map);
+    const icon = (color, shape='50%') => L.divIcon({ className:'', html:`<div style="width:18px;height:18px;border:4px solid white;border-radius:${shape};background:${color};box-shadow:0 2px 8px #46534c80"></div>`, iconSize:[18,18] });
+    L.marker(pickupCoords,{icon:icon('#0b7a4b')}).addTo(map).bindTooltip('Pickup: Sandton City');
+    L.marker(dropoffCoords,{icon:icon('#18211d','3px')}).addTo(map).bindTooltip('Destination: Rosebank Mall');
+    L.polyline([pickupCoords,[-26.118,28.052],[-26.132,28.048],dropoffCoords],{color:'#0b7a4b',weight:5,opacity:.8,dashArray:'1 9',lineCap:'round'}).addTo(map);
+    const carIcon=L.divIcon({className:'',html:'<div style="font-size:22px;filter:drop-shadow(0 2px 3px #0003)">🚗</div>',iconSize:[26,26]});
+    [[-26.102,28.045],[-26.115,28.065],[-26.137,28.057],[-26.151,28.031],[-26.123,28.036]].forEach((pos,index)=>L.marker(pos,{icon:L.divIcon({className:'',html:'<div style="font-size:22px;filter:drop-shadow(0 2px 3px #0003);transform:rotate('+(index%2?12:-8)+'deg)">🚗</div>',iconSize:[26,26]})}).addTo(map));
+    let ride = { name:'MyRide Go', price:86 };
+    let paymentMethod = 'cash';
+    let driverMarker;
+    let rideSocket;
+    const bookButton = document.getElementById('book');
+    const statusCopy={assigned:'is on the way',arrived:'has arrived',started:'is taking you to your destination',completed:'completed your trip',cancelled:'ride was cancelled'};
+    function updateRideTracking(currentRide){
+      const driver=currentRide.driver;
+      if(!driver) return;
+      const driverCard=document.getElementById('driver');
+      driverCard.querySelector('strong').textContent=`${driver.name} ${statusCopy[currentRide.status]||'is assigned'}`;
+      driverCard.querySelector('.driver-info span').textContent=`${driver.rating} ★ • ${driver.vehicle_make} ${driver.vehicle_model} • Live status: ${currentRide.status}`;
+      driverCard.querySelector('.plate').textContent=driver.license_plate;
+      driverCard.classList.add('show');
+      if(driverMarker) driverMarker.setLatLng([driver.lat,driver.lng]);
+      else driverMarker=L.marker([driver.lat,driver.lng],{icon:carIcon,zIndexOffset:500}).addTo(map).bindTooltip(driver.name);
+      const buttonCopy={assigned:'Driver arriving',arrived:'Driver has arrived',started:'Trip in progress',completed:'Trip completed',cancelled:'Ride cancelled'};
+      bookButton.textContent=buttonCopy[currentRide.status]||'Ride confirmed';
+      if(['completed','cancelled'].includes(currentRide.status)) rideSocket?.close();
+    }
+    function trackRide(rideId,token){
+      rideSocket?.close();
+      const protocol=location.protocol==='https:'?'wss':'ws';
+      rideSocket=new WebSocket(`${protocol}://${location.host}/ws/rides/${rideId}?token=${encodeURIComponent(token)}`);
+      rideSocket.onmessage=event=>{
+        const update=JSON.parse(event.data);
+        if(update.type==='ride.updated') updateRideTracking(update.ride);
+      };
+      rideSocket.onerror=()=>{ document.getElementById('toast').textContent='Live updates interrupted. Reconnecting when available.'; };
+    }
+    document.querySelectorAll('.ride').forEach(button=>button.addEventListener('click',()=>{
+      document.querySelectorAll('.ride').forEach(item=>item.classList.remove('selected'));
+      button.classList.add('selected');
+      ride={name:button.dataset.name,price:Number(button.dataset.price)};
+      bookButton.textContent=`Request ${ride.name} • R${ride.price}`;
+    }));
+    document.querySelectorAll('.chip').forEach(button=>button.addEventListener('click',()=>document.getElementById('dropoff').value=button.dataset.place));
+    document.getElementById('payment').addEventListener('click',event=>{
+      paymentMethod=paymentMethod==='cash'?'card':'cash';
+      const panel=event.target.closest('.payment');
+      panel.querySelector('.pay-icon').textContent=paymentMethod==='cash'?'💵':'💳';
+      panel.querySelector('strong').textContent=paymentMethod==='cash'?'Cash':'Visa •••• 4242';
+      panel.querySelector('span[style]').textContent=paymentMethod==='cash'?'Pay after your trip':'Secure card payment';
+    });
+    bookButton.addEventListener('click',async()=>{
+      const toast=document.getElementById('toast');
+      bookButton.disabled=true; bookButton.textContent='Requesting your ride...'; toast.classList.add('show');
+      try {
+        const sessionResponse=await fetch('/api/v1/auth/demo-session/passenger',{method:'POST'});
+        if(!sessionResponse.ok) throw new Error('Sign in required');
+        const session=await sessionResponse.json();
+        const response=await fetch('/api/rides/book',{method:'POST',headers:{'Content-Type':'application/json','Authorization':`Bearer ${session.access_token}`},body:JSON.stringify({rider_id:'demo-rider',pickup_lat:pickupCoords[0],pickup_lng:pickupCoords[1],dropoff_lat:dropoffCoords[0],dropoff_lng:dropoffCoords[1],payment_method:paymentMethod})});
+        if(!response.ok) throw new Error('Booking failed');
+        const booking=await response.json();
+        updateRideTracking({...booking,status:'assigned'});
+        trackRide(booking.ride_id,session.access_token);
+        toast.classList.remove('show');
+      } catch(error) { toast.textContent='Could not request a ride. Please try again.'; bookButton.disabled=false; bookButton.textContent=`Request ${ride.name} • R${ride.price}`; }
+    });
+    window.scrollTo(0,0);
+    setTimeout(()=>map.invalidateSize(),100);
+  </script>
+  <script src="/static/ecosystem.js"></script>
+</body>
+</html>

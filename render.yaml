@@ -1,0 +1,17 @@
+services:
+  - type: web
+    name: myride-ecosystem
+    runtime: docker
+    plan: free
+    dockerfilePath: ./Dockerfile
+    healthCheckPath: /health
+    autoDeploy: true
+    envVars:
+      - key: ENVIRONMENT
+        value: development
+      - key: MYRIDE_AUTH_SECRET
+        generateValue: true
+      - key: MYRIDE_DATABASE_PATH
+        value: /tmp/myride.db
+      - key: MYRIDE_ALLOWED_ORIGINS
+        value: https://myride-ecosystem.onrender.com

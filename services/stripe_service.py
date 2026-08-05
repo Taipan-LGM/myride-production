@@ -201,16 +201,15 @@ def verify_webhook_signature(payload: bytes, signature_header: str) -> bool:
     Verify Stripe webhook signature.
     Returns True if signature is valid.
     """
-    if stripe is None:
-        logger.warning("Stripe package not installed — webhook verification disabled")
-        return True
-    
     config = get_stripe_config()
     webhook_secret = config.get("webhook_secret")
-    
     if not webhook_secret:
-        logger.warning("STRIPE_WEBHOOK_SECRET not set — webhook verification disabled")
-        return True  # Allow in development
+        development = os.getenv("ENVIRONMENT", "development") == "development"
+        logger.warning("STRIPE_WEBHOOK_SECRET not set — webhook accepted only in development")
+        return development
+    if stripe is None:
+        logger.error("Stripe package unavailable — webhook signature cannot be verified")
+        return False
     
     try:
         stripe.Webhook.construct_event(

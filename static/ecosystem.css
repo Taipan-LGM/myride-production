@@ -1,0 +1,166 @@
+:root {
+  --eco-ink: #17231d;
+  --eco-green: #08784a;
+  --eco-lime: #b9ef37;
+  --eco-coral: #ed6a50;
+  --eco-amber: #f0b849;
+  --eco-paper: #f3f6f3;
+  --eco-line: #dbe3de;
+  --eco-muted: #69766f;
+  --eco-white: #fff;
+}
+
+.ecosystem-switcher {
+  position: fixed;
+  z-index: 1800;
+  top: 16px;
+  left: 50%;
+  display: flex;
+  gap: 3px;
+  padding: 4px;
+  transform: translateX(-50%);
+  border: 1px solid rgba(255,255,255,.8);
+  border-radius: 7px;
+  background: rgba(23,35,29,.94);
+  box-shadow: 0 12px 30px rgba(23,35,29,.18);
+  backdrop-filter: blur(10px);
+}
+.ecosystem-switcher a {
+  min-width: 82px;
+  height: 34px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  border-radius: 5px;
+  color: #adbbb4;
+  font: 700 11px "DM Sans", sans-serif;
+  text-decoration: none;
+}
+.ecosystem-switcher a.active { color: var(--eco-ink); background: var(--eco-lime); }
+.ecosystem-switcher svg { width: 14px; height: 14px; }
+
+.eco-app { min-height: 100vh; display: grid; grid-template-columns: 220px minmax(0,1fr); color: var(--eco-ink); background: var(--eco-paper); font-family: "DM Sans", sans-serif; letter-spacing: 0; }
+.eco-rail { position: sticky; top: 0; height: 100vh; padding: 23px 15px; display: flex; flex-direction: column; background: var(--eco-ink); color: white; }
+.eco-brand { padding: 0 7px 25px; display: flex; align-items: center; gap: 9px; color: white; font: 800 20px "Manrope", sans-serif; text-decoration: none; }
+.eco-mark { width: 34px; height: 34px; display: grid; place-items: center; border-radius: 7px; background: var(--eco-lime); color: var(--eco-ink); }
+.eco-label { padding: 0 9px 8px; color: #75877d; font-size: 9px; font-weight: 800; text-transform: uppercase; }
+.eco-nav { display: grid; gap: 4px; }
+.eco-nav a { min-height: 43px; padding: 0 11px; display: flex; align-items: center; gap: 10px; border-radius: 6px; color: #acbbb3; font-size: 12px; font-weight: 700; text-decoration: none; }
+.eco-nav a.active, .eco-nav a:hover { color: white; background: #2a3931; box-shadow: inset 3px 0 var(--eco-lime); }
+.eco-nav svg { width: 17px; }
+.eco-health { margin-top: auto; padding: 15px 8px 0; border-top: 1px solid #34443b; color: #aebbb4; font-size: 10px; }
+.eco-dot { width: 7px; height: 7px; display: inline-block; margin-right: 7px; border-radius: 50%; background: #42d386; box-shadow: 0 0 0 5px rgba(66,211,134,.1); }
+.eco-version { margin: 9px 0 0 15px; color: #65776d; font-size: 8px; }
+.eco-main { min-width: 0; }
+.eco-topbar { height: 66px; padding: 0 27px; display: flex; align-items: center; justify-content: space-between; border-bottom: 1px solid var(--eco-line); background: rgba(255,255,255,.95); }
+.eco-title { font: 800 15px "Manrope", sans-serif; }
+.eco-title small { display: block; color: var(--eco-muted); font: 500 10px "DM Sans", sans-serif; }
+.eco-user { padding: 5px 9px 5px 5px; display: flex; align-items: center; gap: 8px; border: 1px solid var(--eco-line); border-radius: 6px; background: white; font-size: 10px; font-weight: 800; }
+.eco-avatar { width: 27px; height: 27px; display: grid; place-items: center; border-radius: 50%; background: #e1f3e9; color: var(--eco-green); }
+.eco-content { padding: 24px 27px 38px; }
+.eco-heading { margin-bottom: 18px; display: flex; justify-content: space-between; align-items: end; }
+.eco-heading h1 { margin: 0 0 3px; font: 800 27px "Manrope", sans-serif; }
+.eco-heading p { margin: 0; color: var(--eco-muted); font-size: 11px; }
+.eco-live { padding: 7px 10px; border: 1px solid #bce1cb; border-radius: 999px; background: #effaf3; color: var(--eco-green); font-size: 9px; font-weight: 900; }
+.eco-metrics { display: grid; grid-template-columns: repeat(4,1fr); gap: 9px; margin-bottom: 14px; }
+.eco-metric { min-height: 116px; padding: 14px; border: 1px solid var(--eco-line); border-radius: 7px; background: white; }
+.eco-metric header { display: flex; justify-content: space-between; color: var(--eco-muted); font-size: 9px; font-weight: 800; text-transform: uppercase; }
+.eco-metric svg { width: 15px; }
+.eco-value { margin: 14px 0 4px; font: 800 24px "Manrope", sans-serif; }
+.eco-trend { color: var(--eco-green); font-size: 9px; font-weight: 700; }
+.eco-grid { display: grid; grid-template-columns: minmax(0,1.5fr) minmax(270px,.7fr); gap: 13px; margin-bottom: 13px; }
+.eco-panel { overflow: hidden; border: 1px solid var(--eco-line); border-radius: 7px; background: white; }
+.eco-panel-head { min-height: 50px; padding: 0 14px; display: flex; align-items: center; justify-content: space-between; border-bottom: 1px solid var(--eco-line); }
+.eco-panel-head h2 { margin: 0; font: 800 12px "Manrope", sans-serif; }
+.eco-panel-head span { color: var(--eco-muted); font-size: 9px; }
+#fleet-map { height: 345px; background: #dce8df; }
+.eco-feed { padding: 3px 14px; }
+.eco-insight { padding: 12px 0; display: grid; grid-template-columns: 28px 1fr; gap: 8px; border-bottom: 1px solid var(--eco-line); }
+.eco-insight:last-child { border-bottom: 0; }
+.eco-insight-icon { width: 27px; height: 27px; display: grid; place-items: center; border-radius: 5px; background: #e1f3e9; color: var(--eco-green); }
+.eco-insight.warn .eco-insight-icon { color: #9c6800; background: #fff2d5; }
+.eco-insight svg { width: 14px; }
+.eco-insight strong { display: block; margin-bottom: 2px; font-size: 10px; }
+.eco-insight p { margin: 0; color: var(--eco-muted); font-size: 9px; line-height: 1.45; }
+.eco-table-wrap { overflow-x: auto; }
+.eco-table { width: 100%; border-collapse: collapse; font-size: 10px; }
+.eco-table th { padding: 9px 13px; color: var(--eco-muted); background: #f8faf8; text-align: left; font-size: 8px; text-transform: uppercase; }
+.eco-table td { padding: 11px 13px; border-top: 1px solid var(--eco-line); white-space: nowrap; }
+.eco-status { padding: 4px 7px; border-radius: 999px; background: #e1f3e9; color: var(--eco-green); font-size: 8px; font-weight: 900; text-transform: uppercase; }
+.eco-status.completed { background: #edf0ee; color: #526159; }
+.eco-status.cancelled { background: #fde7e2; color: #a43e2b; }
+.eco-empty { padding: 35px; color: var(--eco-muted); text-align: center; font-size: 11px; }
+.eco-services { padding: 13px; display: grid; grid-template-columns: 1fr 1fr; gap: 7px; }
+.eco-service { padding: 9px; border: 1px solid var(--eco-line); border-radius: 5px; }
+.eco-service strong { display: flex; justify-content: space-between; font-size: 9px; }
+.eco-service small { color: var(--eco-muted); font-size: 8px; }
+.eco-service b { color: var(--eco-green); }
+
+.driver-hero { padding: 20px; margin-bottom: 14px; display: flex; justify-content: space-between; align-items: center; border-radius: 8px; background: var(--eco-ink); color: white; }
+.driver-hero h1 { margin: 0 0 4px; font: 800 25px "Manrope", sans-serif; }
+.driver-hero p { margin: 0; color: #aebbb4; font-size: 11px; }
+.driver-online { display: flex; align-items: center; gap: 8px; color: #d4ded8; font-size: 10px; font-weight: 800; }
+.eco-toggle { width: 42px; height: 23px; padding: 3px; border: 0; border-radius: 999px; background: var(--eco-green); }
+.eco-toggle:after { content: ""; display: block; width: 17px; height: 17px; margin-left: 19px; border-radius: 50%; background: white; }
+.driver-grid { display: grid; grid-template-columns: 1.35fr .65fr; gap: 13px; }
+.trip-body { padding: 17px; }
+.trip-route { position: relative; padding-left: 26px; margin: 17px 0; }
+.trip-route:before { content: ""; position: absolute; left: 6px; top: 8px; bottom: 8px; border-left: 2px dotted #a9b7af; }
+.trip-stop { position: relative; margin-bottom: 16px; }
+.trip-stop:last-child { margin-bottom: 0; }
+.trip-stop:before { content: ""; position: absolute; left: -24px; top: 2px; width: 10px; height: 10px; border-radius: 50%; background: var(--eco-green); }
+.trip-stop:last-child:before { border-radius: 2px; background: var(--eco-ink); }
+.trip-stop strong, .trip-stop small { display: block; }
+.trip-stop strong { font-size: 11px; }
+.trip-stop small { color: var(--eco-muted); font-size: 9px; }
+.trip-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 7px; }
+.eco-button { min-height: 42px; display: flex; align-items: center; justify-content: center; gap: 6px; border: 1px solid var(--eco-line); border-radius: 6px; background: white; color: var(--eco-ink); font-size: 10px; font-weight: 800; }
+.eco-button.primary { border-color: var(--eco-ink); background: var(--eco-ink); color: white; }
+.eco-button svg { width: 14px; }
+.earning-card { padding: 17px; margin-bottom: 13px; border-color: #bce1cb; background: #e8f6ed; }
+.earning-card strong { display: block; margin: 8px 0 2px; font: 800 27px "Manrope", sans-serif; }
+.earning-card small { color: var(--eco-green); font-size: 9px; }
+
+.eco-assistant-button { position: fixed; z-index: 2000; right: 20px; bottom: 20px; width: 48px; height: 48px; display: grid; place-items: center; border: 0; border-radius: 50%; background: var(--eco-green); color: white; box-shadow: 0 14px 35px rgba(23,35,29,.2); }
+.eco-assistant { position: fixed; z-index: 2100; right: 20px; bottom: 78px; width: min(350px,calc(100vw - 28px)); transform: translateY(12px); visibility: hidden; opacity: 0; border: 1px solid var(--eco-line); border-radius: 8px; background: white; box-shadow: 0 18px 45px rgba(23,35,29,.18); transition: .25s ease; }
+.eco-assistant.open { transform: none; visibility: visible; opacity: 1; }
+.eco-assistant-head { padding: 12px 13px; display: flex; justify-content: space-between; background: var(--eco-ink); color: white; }
+.eco-assistant-head strong, .eco-assistant-head small { display: block; }
+.eco-assistant-head strong { font-size: 11px; }
+.eco-assistant-head small { color: #aebbb4; font-size: 8px; }
+.eco-assistant-head button { border: 0; background: transparent; color: white; }
+.eco-messages { height: 220px; padding: 12px; overflow-y: auto; background: #f7f9f7; }
+.eco-message { max-width: 88%; padding: 8px 9px; margin-bottom: 7px; border-radius: 6px; background: white; font-size: 10px; line-height: 1.45; }
+.eco-message.user { margin-left: auto; background: var(--eco-green); color: white; }
+.eco-assistant-form { padding: 9px; display: grid; grid-template-columns: 1fr 36px; gap: 6px; }
+.eco-assistant-form input { min-width: 0; height: 36px; padding: 0 9px; border: 1px solid var(--eco-line); border-radius: 5px; }
+.eco-assistant-form button { border: 0; border-radius: 5px; background: var(--eco-ink); color: white; }
+
+@media (max-width: 900px) {
+  .eco-app { grid-template-columns: 72px minmax(0,1fr); }
+  .eco-brand span:last-child, .eco-label, .eco-nav span, .eco-health { display: none; }
+  .eco-nav a { justify-content: center; padding: 0; }
+  .eco-metrics { grid-template-columns: 1fr 1fr; }
+  .eco-grid, .driver-grid { grid-template-columns: 1fr; }
+}
+@media (max-width: 650px) {
+  .ecosystem-switcher { top: auto; bottom: 9px; }
+  .eco-app { display: block; padding-bottom: 62px; }
+  .eco-rail { position: fixed; z-index: 1500; top: auto; bottom: 0; width: 100%; height: 62px; padding: 6px 10px; }
+  .eco-brand, .eco-label, .eco-health { display: none; }
+  .eco-nav { grid-template-columns: repeat(3,1fr); height: 100%; }
+  .eco-nav a { min-height: 48px; flex-direction: column; gap: 1px; font-size: 8px; }
+  .eco-nav span { display: block; }
+  .eco-topbar { height: 58px; padding: 0 14px; }
+  .eco-content { padding: 17px 13px 28px; }
+  .eco-heading { align-items: flex-start; }
+  .eco-heading h1 { font-size: 22px; }
+  .eco-metrics { gap: 7px; }
+  .eco-metric { min-height: 100px; padding: 11px; }
+  .eco-value { font-size: 20px; }
+  .driver-hero { display: grid; gap: 14px; }
+  #fleet-map { height: 290px; }
+  .eco-assistant-button { bottom: 74px; right: 13px; }
+  .eco-assistant { bottom: 130px; right: 13px; }
+}
