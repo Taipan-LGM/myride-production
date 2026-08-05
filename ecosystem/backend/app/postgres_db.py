@@ -177,6 +177,64 @@ async def fetch_trip(trip_id: str) -> dict[str, Any] | None:
     return _row_to_trip_dict(row)
 
 
+async def claim_trip(trip_id: str, driver_id: str) -> dict[str, Any] | None:
+    """Atomically assign a requested, unassigned trip to one driver."""
+    if _pool is None:
+        return None
+    async with _pool.acquire() as conn:
+        row = await conn.fetchrow(
+            """
+            UPDATE ride_events
+            SET driver_external_id = $2,
+                status = 'driver_assigned',
+                raw = COALESCE(raw, '{}'::jsonb) || jsonb_build_object(
+                    'driver_id', $2,
+                    'status', 'driver_assigned',
+                    'updated_at', NOW()
+                ),
+                updated_at = NOW()
+            WHERE external_id = $1
+              AND driver_external_id IS NULL
+              AND status = 'requested'
+            RETURNING *
+            """,
+            trip_id,
+            driver_id,
+        )
+    return _row_to_trip_dict(row)
+
+
+async def patch_trip(trip_id: str, updates: dict[str, Any]) -> dict[str, Any] | None:
+    """Atomically merge selected trip fields without overwriting concurrent changes."""
+    if _pool is None:
+        return None
+    payload = json.dumps(updates, default=str)
+    async with _pool.acquire() as conn:
+        row = await conn.fetchrow(
+            """
+            UPDATE ride_events
+            SET driver_external_id = CASE
+                    WHEN $2::jsonb ? 'driver_id' THEN $2::jsonb ->> 'driver_id'
+                    ELSE driver_external_id
+                END,
+                status = COALESCE($2::jsonb ->> 'status', status),
+                fare_cents = CASE
+                    WHEN $2::jsonb ? 'fare_final_cents'
+                        THEN ($2::jsonb ->> 'fare_final_cents')::integer
+                    ELSE fare_cents
+                END,
+                payment_status = COALESCE($2::jsonb ->> 'payment_status', payment_status),
+                raw = COALESCE(raw, '{}'::jsonb) || $2::jsonb,
+                updated_at = NOW()
+            WHERE external_id = $1
+            RETURNING *
+            """,
+            trip_id,
+            payload,
+        )
+    return _row_to_trip_dict(row)
+
+
 async def list_trips(
     *,
     rider_id: str | None = None,

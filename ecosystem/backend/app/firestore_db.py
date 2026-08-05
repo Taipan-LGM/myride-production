@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 import logging
 import os
 import uuid
@@ -18,6 +19,7 @@ _memory: dict[str, dict[str, Any]] = {
     "drivers": {},
     "trips": {},
 }
+_memory_trip_lock = asyncio.Lock()
 
 
 def _now() -> datetime:
@@ -190,17 +192,21 @@ class FirestoreDB:
         return Trip(**doc) if doc else None
 
     async def update_trip(self, trip_id: str, updates: dict[str, Any]) -> Trip | None:
+        updates = {**updates, "updated_at": _now().isoformat()}
+        from app.postgres_db import is_postgres_primary, mirror_trip, patch_trip
+
+        if is_postgres_primary():
+            patched = await patch_trip(trip_id, updates)
+            if patched:
+                _memory["trips"][trip_id] = patched
+            return Trip(**patched) if patched else None
+
         trip = await self.get_trip(trip_id)
         if not trip:
             return None
-        updates = {**updates, "updated_at": _now().isoformat()}
         merged = {**trip.model_dump(), **updates}
-        from app.postgres_db import is_postgres_primary, mirror_trip
 
-        if is_postgres_primary():
-            await mirror_trip(merged)
-            _memory["trips"][trip_id] = merged
-        elif self._use_memory:
+        if self._use_memory:
             _memory["trips"][trip_id].update(updates)
             try:
                 await mirror_trip(merged)
@@ -213,6 +219,58 @@ class FirestoreDB:
             except Exception:
                 pass
         return Trip(**merged)
+
+    async def claim_trip(self, trip_id: str, driver_id: str) -> Trip | None:
+        """Atomically assign a requested, unassigned trip to one driver."""
+        from app.postgres_db import claim_trip as pg_claim_trip, is_postgres_primary, mirror_trip
+
+        if is_postgres_primary():
+            claimed = await pg_claim_trip(trip_id, driver_id)
+            if claimed:
+                _memory["trips"][trip_id] = claimed
+            return Trip(**claimed) if claimed else None
+
+        updates = {
+            "driver_id": driver_id,
+            "status": TripStatus.driver_assigned.value,
+            "updated_at": _now().isoformat(),
+        }
+        if self._use_memory:
+            async with _memory_trip_lock:
+                current = _memory["trips"].get(trip_id)
+                if not current or current.get("driver_id") or current.get("status") != TripStatus.requested.value:
+                    return None
+                current.update(updates)
+                claimed = dict(current)
+            try:
+                await mirror_trip(claimed)
+            except Exception:
+                pass
+            return Trip(**claimed)
+
+        from google.cloud import firestore
+
+        document = self._trips().document(trip_id)
+        transaction = self._client.transaction()
+
+        @firestore.async_transactional
+        async def claim(transaction):
+            snapshot = await document.get(transaction=transaction)
+            if not snapshot.exists:
+                return None
+            current = snapshot.to_dict() or {}
+            if current.get("driver_id") or current.get("status") != TripStatus.requested.value:
+                return None
+            transaction.update(document, updates)
+            return {**current, **updates, "id": current.get("id", snapshot.id)}
+
+        claimed = await claim(transaction)
+        if claimed:
+            try:
+                await mirror_trip(claimed)
+            except Exception:
+                pass
+        return Trip(**claimed) if claimed else None
 
     async def list_trips_for_rider(self, rider_id: str, limit: int = 20) -> list[Trip]:
         from app.postgres_db import is_postgres_primary, list_trips as pg_list

@@ -219,12 +219,12 @@ async def accept_ride(
     user: AuthUser = Depends(require_role("driver", "admin")),
 ):
     assert_self_or_admin(user, body.driver_id, label="driver")
-    trip = await db.update_trip(
-        trip_id,
-        {"driver_id": body.driver_id, "status": TripStatus.driver_assigned.value},
-    )
+    trip = await db.claim_trip(trip_id, body.driver_id)
     if not trip:
-        raise HTTPException(404, "Trip not found")
+        existing = await db.get_trip(trip_id)
+        if not existing:
+            raise HTTPException(404, "Trip not found")
+        raise HTTPException(409, "Trip is no longer available")
     _pending_driver_requests.pop(trip_id, None)
     await _broadcast_chat(trip_id, {"event": "trip_update", "data": {"status": "driver_assigned"}})
     return trip
@@ -249,11 +249,8 @@ async def _require_trip_driver(
     trip = await db.get_trip(trip_id)
     if not trip:
         raise HTTPException(404, "Trip not found")
-    if user.role != "admin" and trip.driver_id and trip.driver_id != user.id:
+    if user.role == "driver" and trip.driver_id != user.id:
         raise HTTPException(403, "Not assigned to this trip")
-    if user.role == "driver" and not trip.driver_id:
-        # allow first status push only if they just accepted; otherwise require assignment
-        pass
     return trip
 
 

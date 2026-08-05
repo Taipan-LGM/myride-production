@@ -69,3 +69,44 @@ def test_payments_and_mutations_require_auth():
             },
         )
         assert forbidden.status_code == 403
+
+
+def test_driver_cannot_complete_unassigned_trip():
+    with TestClient(app) as client:
+        rider = _login(client, "rider@myride.co.za", "ride123", "rider")
+        driver = _login(client, "driver@myride.co.za", "drive123", "driver")
+
+        requested = client.post(
+            "/request-ride",
+            headers={"Authorization": f"Bearer {rider}"},
+            json={
+                "rider_id": "rider-demo-001",
+                "pickup": {"lat": -33.9249, "lng": 18.4241},
+                "dropoff": {"lat": -33.9068, "lng": 18.4198},
+                "fare_estimate_cents": 12000,
+            },
+        )
+        assert requested.status_code == 200, requested.text
+
+        completed = client.post(
+            f"/complete-ride/{requested.json()['id']}",
+            headers={"Authorization": f"Bearer {driver}"},
+        )
+
+        assert completed.status_code == 403
+        assert completed.json()["detail"] == "Not assigned to this trip"
+
+        accepted = client.post(
+            f"/accept-ride/{requested.json()['id']}",
+            headers={"Authorization": f"Bearer {driver}"},
+            json={"driver_id": "driver-demo-001"},
+        )
+        assert accepted.status_code == 200, accepted.text
+
+        accepted_again = client.post(
+            f"/accept-ride/{requested.json()['id']}",
+            headers={"Authorization": f"Bearer {driver}"},
+            json={"driver_id": "driver-demo-001"},
+        )
+        assert accepted_again.status_code == 409
+        assert accepted_again.json()["detail"] == "Trip is no longer available"
