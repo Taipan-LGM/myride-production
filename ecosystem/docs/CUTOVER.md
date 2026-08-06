@@ -1,6 +1,6 @@
 # Cutover checklist — My Ride SA → live (A + B + C)
 
-**Ecosystem version:** `0.2.3` · **Legacy web:** `1.0.3`  
+**Ecosystem version:** `0.3.1` · **Legacy web:** retirement candidate
 **Repo:** https://github.com/Taipan-LGM/My-Ride  
 
 This is the single go-live checklist covering:
@@ -25,7 +25,7 @@ This is the single go-live checklist covering:
 | 5 | Flutter → ecosystem host (not legacy Node) | Local rider up (`:8766`); staging: `./run-rider-staging.sh` |
 | 6 | Live Stripe/Twilio webhooks + `PUBLIC_BASE_URL` | CORS/URL auto; **Stripe/Twilio keys = you** |
 | 7 | Go/no-go: book + pay + SOS + admin JWT | Book/SOS/admin/hold-mock green; live pay needs Stripe |
-| 8 | Rotate/disable demo accounts before public | `ALLOW_DEMO_ACCOUNTS=false` — see [PUBLIC_LAUNCH.md](./PUBLIC_LAUNCH.md) |
+| 8 | Replace and disable demo accounts before public | Future launch gate: implement production identity/JWT exchange first; demos remain enabled in 0.3.1 to avoid lockout |
 
 Brief PART 13 (K8s/RN/Elixir) **mapped to Path A:** Compose/Render instead of kubectl; Flutter instead of RN; FastAPI WS instead of Phoenix.
 
@@ -155,17 +155,19 @@ Twilio (ecosystem only): `/webhooks/whatsapp`, `/webhooks/sms`, `/voice/incoming
 - [ ] One live WhatsApp / SMS / voice message each (if Twilio live)
 - [x] Admin metrics only with admin JWT (smoke ledger)
 - [ ] Rate limit does not starve hub
-- [ ] Demo accounts **rotated or disabled** before public traffic
+- [ ] Production identity/JWT exchange implemented and demo accounts disabled before public traffic
 - [ ] `USE_POSTGRES_PRIMARY=true` after dual-write soak
 
 ### C4. Traffic split (until full cutover)
 
 | Audience | URL |
 |----------|-----|
-| Legacy SPA / existing Render users | `my-ride` service |
+| Legacy SPA / existing Render users | Retirement candidate; HTTP 503 and not used by current Flutter production config |
 | AI hub + Flutter Path A | `my-ride-ecosystem` |
 
 Do **not** point Flutter at the legacy Node host.
+
+Operational monitoring, backup drills, and incident procedures are defined in [OPERATIONS.md](./OPERATIONS.md).
 
 ---
 

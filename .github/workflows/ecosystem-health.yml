@@ -1,0 +1,52 @@
+name: Ecosystem health
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "*/15 * * * *"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ecosystem-health
+  cancel-in-progress: true
+
+jobs:
+  production-health:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Verify health and launch guards
+        shell: bash
+        env:
+          BASE_URL: https://my-ride-ecosystem.onrender.com
+        run: |
+          set -euo pipefail
+          health="$(curl --fail --silent --show-error --retry 2 --max-time 20 "$BASE_URL/health")"
+          cutover="$(curl --fail --silent --show-error --retry 2 --max-time 20 "$BASE_URL/ops/cutover")"
+          python3 - "$health" "$cutover" <<'PY'
+          import json
+          import sys
+
+          health = json.loads(sys.argv[1])
+          cutover = json.loads(sys.argv[2])
+          assert health.get("status") == "ok", health
+          assert health.get("services", {}).get("postgres") == "primary", health
+          assert health.get("services", {}).get("redis") == "connected", health
+
+          checks = cutover.get("checks", {})
+          required = {
+              "https_public_base": True,
+              "cors_locked": True,
+              "jwt_strong": True,
+              "postgres_primary": True,
+              "redis_connected": True,
+              "debug_off": True,
+              "environment_production": True,
+          }
+          failures = {key: checks.get(key) for key, expected in required.items() if checks.get(key) != expected}
+          if failures:
+              raise SystemExit(f"Production guard failure: {failures}")
+          print(f"Healthy version={health.get('version')} missing_launch_items={cutover.get('missing', [])}")
+          PY

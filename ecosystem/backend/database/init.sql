@@ -92,3 +92,19 @@ CREATE INDEX IF NOT EXISTS idx_ride_events_rider ON ride_events(rider_external_i
 CREATE INDEX IF NOT EXISTS idx_ride_events_status ON ride_events(status);
 CREATE INDEX IF NOT EXISTS idx_payment_ledger_trip ON payment_ledger(trip_external_id);
 CREATE UNIQUE INDEX IF NOT EXISTS idx_payment_ledger_idempotency ON payment_ledger(idempotency_key) WHERE idempotency_key IS NOT NULL;
+
+-- One-way production cleanup: Phase-0 records are synthetic and uniquely marked.
+DELETE FROM payment_ledger
+WHERE trip_external_id IN (
+    SELECT external_id
+    FROM ride_events
+    WHERE raw ->> 'booking_channel' = 'phase0'
+)
+OR record ->> 'trip_id' IN (
+    SELECT external_id
+    FROM ride_events
+    WHERE raw ->> 'booking_channel' = 'phase0'
+);
+DELETE FROM ride_events WHERE raw ->> 'booking_channel' = 'phase0';
+DELETE FROM rides WHERE booking_channel = 'phase0';
+DELETE FROM driver_locations WHERE driver_external_id LIKE 'driver-phase0-%';

@@ -1,7 +1,7 @@
 # Ecosystem FastAPI — Render / Docker deploy
 
 **Stack:** FastAPI + (optional) Render Postgres + Redis  
-**Version:** `ecosystem/backend/app/__init__.py` → **0.2.1+**  
+**Version:** `ecosystem/backend/app/__init__.py` → **0.3.1**
 **Hub:** `/` · Health: `/health` · Docs: `/docs`  
 **Local Docker:** `docker compose -f docker-compose.prod.yml` (see Makefile `up-prod`)
 
@@ -13,7 +13,6 @@ Root [`render.yaml`](../../render.yaml) defines:
 
 | Service | Name | Role |
 |---------|------|------|
-| web (Node) | `my-ride` | Legacy SPA/API |
 | web (Docker) | `my-ride-ecosystem` | Path A FastAPI hub |
 | redis | `myride-redis` | Cache / rate-limit ready |
 | postgres | `myride-pg` | Trips / ledger |
@@ -25,7 +24,7 @@ Root [`render.yaml`](../../render.yaml) defines:
 3. After first deploy, set **sync: false** secrets (below) in Dashboard  
 4. Note public URL: `https://my-ride-ecosystem.onrender.com` (or custom domain)
 
-**Status (2026-07-18):** `GET /health` → 200 (`0.2.1`, redis connected, postgres dual-write). Hub `/` → 200.
+**Status (2026-08-06):** release `0.3.1` retains Redis/PostgreSQL primary operation, disables Phase-0 seeding, and retires the unused legacy service from the Blueprint.
 
 ### Env to set in Dashboard (ecosystem service)
 

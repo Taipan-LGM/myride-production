@@ -1,4 +1,4 @@
-# My Ride — Render Blueprint (legacy Node + Path A FastAPI)
+# My Ride — Render Blueprint (FastAPI ecosystem)
 # https://render.com/docs/infrastructure-as-code
 #
 # Apply: Dashboard → New → Blueprint → repo Taipan-LGM/My-Ride (master)
@@ -16,41 +16,7 @@ databases:
     user: myride
 
 services:
-  # -------------------------------------------------------------------------
-  # A) Legacy Express + SQLite SPA
-  # -------------------------------------------------------------------------
-  - type: web
-    name: my-ride
-    runtime: node
-    plan: starter
-    buildCommand: npm install
-    startCommand: npm start
-    healthCheckPath: /api/health
-    disk:
-      name: sqlite-data
-      mountPath: /var/data
-      sizeGB: 1
-    envVars:
-      - key: NODE_ENV
-        value: production
-      - key: HOST
-        value: 0.0.0.0
-      - key: JWT_SECRET
-        generateValue: true
-      - key: SQLITE_PATH
-        value: /var/data/myride.sqlite
-      - key: STRIPE_SECRET_KEY
-        sync: false
-      - key: STRIPE_PUBLISHABLE_KEY
-        sync: false
-      - key: STRIPE_WEBHOOK_SECRET
-        sync: false
-      - key: EXTRA_APP_ORIGINS
-        sync: false
-
-  # -------------------------------------------------------------------------
-  # B) Path A — FastAPI ecosystem hub (Docker)
-  # -------------------------------------------------------------------------
+  # FastAPI ecosystem hub (Docker)
   - type: web
     name: my-ride-ecosystem
     runtime: docker
@@ -73,7 +39,7 @@ services:
       - key: USE_POSTGRES_PRIMARY
         value: "true"
       - key: ALLOW_PHASE0_SEED
-        value: "true"
+        value: "false"
       - key: JWT_SECRET
         generateValue: true
       - key: DATABASE_URL
