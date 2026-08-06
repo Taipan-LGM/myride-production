@@ -6,7 +6,7 @@ The FastAPI ecosystem at `https://my-ride-ecosystem.onrender.com` is the product
 
 ## Monitoring and alerts
 
-The scheduled `Ecosystem health` GitHub Actions workflow checks every 15 minutes that:
+The scheduled `Ecosystem health` GitHub Actions workflow checks hourly, keeping private-repository usage within the GitHub Actions free allowance, that:
 
 - `/health` returns HTTP 200 and `status=ok`;
 - PostgreSQL is primary and Redis is connected;
