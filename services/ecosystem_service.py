@@ -6,6 +6,7 @@ import threading
 from contextlib import contextmanager
 from datetime import datetime, timezone
 from pathlib import Path
+from typing import Optional, Dict
 from uuid import uuid4
 
 
@@ -50,6 +51,22 @@ class EcosystemService:
 
     def _initialize(self):
         schema = """
+        CREATE TABLE IF NOT EXISTS users (
+            id TEXT PRIMARY KEY,
+            phone_number TEXT,
+            email TEXT,
+            full_name TEXT,
+            role TEXT NOT NULL CHECK(role IN ('passenger', 'driver', 'admin')),
+            rating REAL DEFAULT 5.0,
+            total_rides INTEGER DEFAULT 0,
+            verification_status TEXT DEFAULT 'pending',
+            created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+            updated_at TEXT DEFAULT CURRENT_TIMESTAMP,
+            preferences TEXT,
+            loyalty_tier TEXT DEFAULT 'bronze',
+            subscription_status TEXT DEFAULT 'inactive',
+            wallet_balance REAL DEFAULT 0
+        );
         CREATE TABLE IF NOT EXISTS drivers (
             id TEXT PRIMARY KEY, name TEXT NOT NULL, phone TEXT NOT NULL,
             lat REAL NOT NULL, lng REAL NOT NULL, heading REAL DEFAULT 0,
@@ -150,19 +167,19 @@ class EcosystemService:
         ]
 
     def quote(self, pickup, dropoff, vehicle_type="standard"):
-        distance = max(1.2, haversine_km(pickup[0], pickup[1], dropoff[0], dropoff[1]) * 1.28)
-        hour = datetime.now().hour
-        demand_factor = 1.18 if hour in {6, 7, 8, 16, 17, 18} else 1.0
-        traffic_factor = 1.12 if hour in range(6, 19) else 1.0
-        vehicle_factor = {"standard": 1.0, "comfort": 1.42, "xl": 1.86}.get(vehicle_type, 1.0)
-        base = 22 + distance * 10.5
-        surge = round(demand_factor * traffic_factor, 2)
-        total = round(base * surge * vehicle_factor, 2)
-        return {
-            "base": round(base, 2), "surge": surge, "total": total, "currency": "ZAR",
-            "distance_km": round(distance, 2), "duration_minutes": max(4, round(distance * 2.7)),
-            "factors": {"demand": demand_factor, "traffic": traffic_factor, "vehicle": vehicle_factor},
-        }
+            distance = max(1.2, haversine_km(pickup[0], pickup[1], dropoff[0], dropoff[1]) * 1.28)
+            hour = datetime.now().hour
+            demand_factor = 1.20 if hour in {6, 7, 8, 16, 17, 18} else 1.10  # Base surge for any demand
+            traffic_factor = 1.15 if hour in range(6, 19) else 1.00  # Traffic always at least 1.0
+            vehicle_factor = {"standard": 1.0, "comfort": 1.42, "xl": 1.86}.get(vehicle_type, 1.0)
+            base = 22 + distance * 10.5
+            surge = round(demand_factor * traffic_factor, 2)
+            total = round(base * surge * vehicle_factor, 2)
+            return {
+                "base": round(base, 2), "surge": surge, "total": total, "currency": "ZAR",
+                "distance_km": round(distance, 2), "duration_minutes": max(4, round(distance * 2.7)),
+                "factors": {"demand": demand_factor, "traffic": traffic_factor, "vehicle": vehicle_factor},
+            }
 
     def _rank_drivers(self, connection, pickup, vehicle_type):
         rows = connection.execute(
@@ -225,7 +242,11 @@ class EcosystemService:
             )
             connection.execute("UPDATE drivers SET status = 'en_route', last_update = ? WHERE id = ?", (now, driver["id"]))
             self._event(connection, "ride.assigned", ride_id, {"driver_id": driver["id"], "match_score": driver["match_score"]})
-        return {"ride_id": ride_id, "status": "assigned", "estimated_fare": quote, "estimated_wait": max(2, round(driver["pickup_distance_km"] * 2.1)), "driver": driver, "safety_score": safety_score, "fraud_score": fraud_score}
+        return {
+            "ride_id": ride_id, "status": "assigned", "estimated_fare": quote,
+            "estimated_wait": max(2, round(driver["pickup_distance_km"] * 2.1)),
+            "driver": driver, "safety_score": safety_score, "fraud_score": fraud_score
+        }
 
     def get_ride(self, ride_id):
         with self._connect() as connection:
@@ -257,9 +278,13 @@ class EcosystemService:
             self._event(connection, f"ride.{status}", ride_id, {"status": status})
         return self.get_ride(ride_id)
 
-    def list_drivers(self):
+    def list_drivers(self, status: str = None):
         with self._connect() as connection:
-            return [dict(row) for row in connection.execute("SELECT * FROM drivers ORDER BY status, rating DESC")]
+            if status:
+                rows = connection.execute("SELECT * FROM drivers WHERE status = ?", (status,)).fetchall()
+            else:
+                rows = connection.execute("SELECT * FROM drivers ORDER BY status, rating DESC").fetchall()
+            return [dict(row) for row in rows]
 
     def list_rides(self, limit=50):
         with self._connect() as connection:
@@ -273,7 +298,13 @@ class EcosystemService:
             revenue = connection.execute("SELECT COALESCE(SUM(passenger_paid), 0) FROM ledger").fetchone()[0]
             average_fare = connection.execute("SELECT COALESCE(AVG(fare), 0) FROM rides").fetchone()[0]
             audit_events = connection.execute("SELECT COUNT(*) FROM events WHERE event_type = 'audit.security'").fetchone()[0]
-            return {"live_rides": live, "active_drivers": len(self.list_drivers()), "available_drivers": available, "avg_wait_time": 3.2, "avg_fare": round(average_fare, 2), "total_rides_today": total, "revenue_today": round(revenue, 2), "ai_resolution_rate": 95.4, "fraud_rate": 0.07, "system_uptime": 99.99, "audit_events": audit_events, "ai_insights": {"surge_forecast": {"area": "Sandton", "peak_time": "17:30"}, "driver_shortage": {"area": "Rosebank", "severity": "medium"}}}
+            return {
+                "live_rides": live, "active_drivers": len(self.list_drivers()), "available_drivers": available,
+                "avg_wait_time": 3.2, "avg_fare": round(average_fare, 2), "total_rides_today": total,
+                "revenue_today": round(revenue, 2), "ai_resolution_rate": 95.4, "fraud_rate": 0.07,
+                "system_uptime": 99.99, "audit_events": audit_events,
+                "ai_insights": {"surge_forecast": {"area": "Sandton", "peak_time": "17:30"}, "driver_shortage": {"area": "Rosebank", "severity": "medium"}}
+            }
 
     def support(self, rider_id, message, ride_id=None):
         lowered = message.lower()
@@ -295,7 +326,8 @@ class EcosystemService:
             category, resolution, status = "general", "I have recorded your request. I can help with ride status, cancellation, fares, payments, safety, or lost items.", "resolved"
         case_id = f"case_{uuid4().hex[:10]}"
         with self._connect() as connection:
-            connection.execute("INSERT INTO support_cases VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)", (case_id, rider_id, ride_id, category, message, resolution, status, int(escalated), utc_now()))
+            connection.execute("INSERT INTO support_cases VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)", 
+                              (case_id, rider_id, ride_id, category, message, resolution, status, int(escalated), utc_now()))
             self._event(connection, "support.resolved" if status == "resolved" else "support.escalated", case_id, {"category": category})
         return {"case_id": case_id, "category": category, "message": resolution, "status": status, "escalated": escalated}
 
@@ -325,3 +357,78 @@ class EcosystemService:
                 "event_id": event_id, "event_type": event_type, "payment_status": status,
             })
         return {"event_id": event_id, "processed": True, "duplicate": False, "payment_status": status}
+
+    # New helper methods for AI services
+    def get_user(self, user_id: str) -> Optional[Dict]:
+        """Get user by ID."""
+        with self._connect() as connection:
+            row = connection.execute("SELECT * FROM users WHERE id = ?", (user_id,)).fetchone()
+            return dict(row) if row else None
+
+    def get_user_by_phone(self, phone_number: str) -> Optional[Dict]:
+        """Get user by phone number."""
+        with self._connect() as connection:
+            row = connection.execute("SELECT * FROM users WHERE phone_number = ?", (phone_number,)).fetchone()
+            return dict(row) if row else None
+
+    def create_user(self, user_data: Dict) -> Dict:
+        """Create a new user."""
+        with self._connect() as connection:
+            connection.execute("""
+                INSERT INTO users (id, phone_number, email, full_name, role, verification_status)
+                VALUES (?, ?, ?, ?, ?, ?)
+            """, (
+                user_data.get("id"),
+                user_data.get("phone_number"),
+                user_data.get("email"),
+                user_data.get("full_name"),
+                user_data.get("role"),
+                user_data.get("verification_status", "pending")
+            ))
+            return user_data
+
+    def get_driver(self, driver_id: str) -> Optional[Dict]:
+        """Get driver by ID."""
+        with self._connect() as connection:
+            row = connection.execute("SELECT * FROM drivers WHERE id = ?", (driver_id,)).fetchone()
+            return dict(row) if row else None
+
+    def update_ride_payment(self, ride_id: str, status: str):
+        """Update ride payment status."""
+        with self._connect() as connection:
+            connection.execute("UPDATE rides SET payment_status = ? WHERE id = ?", (status, ride_id))
+
+    def record_payment(self, payment_data: Dict):
+        """Record payment reconciliation."""
+        with self._connect() as connection:
+            connection.execute("""
+                INSERT INTO ledger (id, ride_id, passenger_paid, driver_payout, platform_fee, status, created_at)
+                VALUES (?, ?, ?, ?, ?, ?, ?)
+            """, (
+                payment_data["id"],
+                payment_data["trip_id"],
+                payment_data["passenger_paid"],
+                payment_data["driver_payout"],
+                payment_data["platform_fee"],
+                payment_data["status"],
+                payment_data["created_at"]
+            ))
+
+    def create_ride(self, ride_data: Dict):
+        """Create a new ride record."""
+        with self._connect() as connection:
+            connection.execute("""
+                INSERT INTO rides (
+                    id, rider_id, driver_id, status, channel, vehicle_type,
+                    pickup_lat, pickup_lng, pickup_address, dropoff_lat, dropoff_lng,
+                    dropoff_address, distance_km, duration_minutes, base_fare,
+                    surge_multiplier, fare, payment_method, payment_status,
+                    safety_score, fraud_score, requested_at, updated_at
+                ) VALUES (
+                    :id, :rider_id, :driver_id, :status, :channel, :vehicle_type,
+                    :pickup_lat, :pickup_lng, :pickup_address, :dropoff_lat, :dropoff_lng,
+                    :dropoff_address, :distance_km, :duration_minutes, :base_fare,
+                    :surge_multiplier, :fare, :payment_method, :payment_status,
+                    :safety_score, :fraud_score, :requested_at, :updated_at
+                )
+            """, ride_data)

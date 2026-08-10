@@ -25,6 +25,7 @@
     .logo { width:36px; height:36px; display:grid; place-items:center; border-radius:8px; background:var(--ink); color:var(--lime); }
     .avatar { width:38px; height:38px; border:0; border-radius:50%; background:#e6f3ec; color:var(--green); font-weight:800; }
     .eyebrow { margin:0 0 5px; color:var(--green); font-size:12px; font-weight:800; text-transform:uppercase; }
+    .version-badge { font-size:11px; color:var(--muted); font-weight:700; text-align:center; padding:4px 0; }
     h1 { margin:0 0 5px; font:800 29px/1.15 "Manrope",sans-serif; }
     .sub { margin:0 0 21px; color:var(--muted); font-size:14px; }
     .route { position:relative; margin-bottom:16px; }
@@ -98,6 +99,7 @@
         <div class="brand"><span class="logo">M</span> MyRide</div>
         <button class="avatar" title="Account">TM</button>
       </div>
+      <div class="version-badge">v1.0.0</div>
       <p class="eyebrow">Ride Johannesburg</p>
       <h1>Where are you going?</h1>
       <p class="sub">Reliable local rides, whenever you need one.</p>
@@ -192,7 +194,7 @@
         const sessionResponse=await fetch('/api/v1/auth/demo-session/passenger',{method:'POST'});
         if(!sessionResponse.ok) throw new Error('Sign in required');
         const session=await sessionResponse.json();
-        const response=await fetch('/api/rides/book',{method:'POST',headers:{'Content-Type':'application/json','Authorization':`Bearer ${session.access_token}`},body:JSON.stringify({rider_id:'demo-rider',pickup_lat:pickupCoords[0],pickup_lng:pickupCoords[1],dropoff_lat:dropoffCoords[0],dropoff_lng:dropoffCoords[1],payment_method:paymentMethod})});
+        const response=await fetch('/api/v1/rides/book',{method:'POST',headers:{'Content-Type':'application/json','Authorization':`Bearer ${session.access_token}`},body:JSON.stringify({rider_id:'demo-rider',pickup_lat:pickupCoords[0],pickup_lng:pickupCoords[1],dropoff_lat:dropoffCoords[0],dropoff_lng:dropoffCoords[1],payment_method:paymentMethod})});
         if(!response.ok) throw new Error('Booking failed');
         const booking=await response.json();
         updateRideTracking({...booking,status:'assigned'});

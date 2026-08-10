@@ -47,7 +47,7 @@
           <a class="${view === 'driver' ? 'active' : ''}" href="/driver">${icon('car-front')}<span>Drive</span></a>
           <a class="${view === 'admin' ? 'active' : ''}" href="/admin">${icon('brain-circuit')}<span>AI Ops</span></a>
         </nav>
-        <div class="eco-health"><span class="eco-dot"></span>All systems operational<div class="eco-version">AUTONOMY CORE v2.0</div></div>
+        <div class="eco-health"><span class="eco-dot"></span>All systems operational<div class="eco-version">MyRide v1.0.0</div></div>
       </aside>
       <section class="eco-main"><header class="eco-topbar"><div class="eco-title">${title}<small>${subtitle}</small></div><div class="eco-user"><span class="eco-avatar">TM</span> Thandi M.</div></header>${content}</section>
     </div>`;
