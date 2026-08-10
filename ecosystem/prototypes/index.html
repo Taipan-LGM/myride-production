@@ -1,0 +1,106 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>My Ride — Prototype Flow Map</title>
+  <link rel="stylesheet" href="shared.css">
+</head>
+<body>
+  <div class="hub">
+    <header class="hub__header">
+      <p class="screen-topbar__brand">MY RIDE</p>
+      <h1>Prototype Flow Map</h1>
+      <p>Click any screen to preview high-fidelity wireframes. Use footer navigation on each screen to walk through linked journeys. <strong><a href="app.html">Open My Ride App preview →</a></strong> Design tokens: <a href="../design-system/tokens.json">tokens.json</a> · <a href="../design-system/tokens.css">tokens.css</a> · React stubs in <code>../react/</code> · <strong>Flutter app</strong> in <code>../frontend/</code> (<code>flutter run</code>)</p>
+    </header>
+
+  <section class="hub__section">
+    <h2>Rider — Onboarding (new)</h2>
+    <div class="flow-row">
+      <a class="flow-card" href="screens/rider-onboarding-phone.html"><span class="flow-card__label">Step 1</span><div class="flow-card__title">Phone number</div><div class="flow-card__meta">Enter mobile</div></a>
+      <span class="flow-arrow">→</span>
+      <a class="flow-card" href="screens/rider-onboarding-otp.html"><span class="flow-card__label">Step 2</span><div class="flow-card__title">OTP verify</div><div class="flow-card__meta">6-digit code</div></a>
+      <span class="flow-arrow">→</span>
+      <a class="flow-card" href="screens/rider-onboarding-permissions.html"><span class="flow-card__label">Step 3</span><div class="flow-card__title">Permissions</div><div class="flow-card__meta">Location + push</div></a>
+      <span class="flow-arrow">→</span>
+      <a class="flow-card" href="screens/rider-onboarding-payment.html"><span class="flow-card__label">Step 4</span><div class="flow-card__title">Payment setup</div><div class="flow-card__meta">Card or skip</div></a>
+      <span class="flow-arrow">→</span>
+      <a class="flow-card" href="screens/rider-home.html"><span class="flow-card__label">Done</span><div class="flow-card__title">Home / Map</div><div class="flow-card__meta">Book a ride</div></a>
+    </div>
+  </section>
+
+  <section class="hub__section">
+    <h2>Rider — Core trip flow</h2>
+    <div class="flow-row">
+      <a class="flow-card" href="screens/rider-home.html"><span class="flow-card__label">Rider</span><div class="flow-card__title">Home / Map</div></a>
+      <span class="flow-arrow">→</span>
+      <a class="flow-card" href="screens/rider-live-trip.html"><span class="flow-card__label">Rider</span><div class="flow-card__title">Live trip</div></a>
+      <span class="flow-arrow">→</span>
+      <a class="flow-card" href="screens/rider-receipt.html"><span class="flow-card__label">Rider</span><div class="flow-card__title">Receipt + rating</div></a>
+    </div>
+  </section>
+
+  <section class="hub__section">
+    <h2>Rider — Scheduled rides &amp; wallet</h2>
+    <div class="flow-row">
+      <a class="flow-card" href="screens/rider-schedule-ride.html"><span class="flow-card__label">Rider</span><div class="flow-card__title">Schedule ride</div><div class="flow-card__meta">Date, time, fare estimate</div></a>
+      <span class="flow-arrow">→</span>
+      <a class="flow-card" href="screens/rider-scheduled-list.html"><span class="flow-card__label">Rider</span><div class="flow-card__title">Upcoming list</div><div class="flow-card__meta">Confirmed · assigned</div></a>
+      <span class="flow-arrow">→</span>
+      <a class="flow-card" href="screens/rider-wallet.html"><span class="flow-card__label">Rider</span><div class="flow-card__title">Wallet</div><div class="flow-card__meta">Balance, top-up, history</div></a>
+    </div>
+  </section>
+
+  <section class="hub__section">
+    <h2>Driver — KYC onboarding (new)</h2>
+    <div class="flow-row">
+      <a class="flow-card" href="screens/driver-kyc-personal.html"><span class="flow-card__label">Step 1</span><div class="flow-card__title">Personal info</div></a>
+      <span class="flow-arrow">→</span>
+      <a class="flow-card" href="screens/driver-kyc-documents.html"><span class="flow-card__label">Step 2</span><div class="flow-card__title">Documents</div></a>
+      <span class="flow-arrow">→</span>
+      <a class="flow-card" href="screens/driver-kyc-vehicle.html"><span class="flow-card__label">Step 3</span><div class="flow-card__title">Vehicle</div></a>
+      <span class="flow-arrow">→</span>
+      <a class="flow-card" href="screens/driver-kyc-status.html"><span class="flow-card__label">Step 4</span><div class="flow-card__title">Background check</div></a>
+      <span class="flow-arrow">→</span>
+      <a class="flow-card" href="screens/driver-trip-request.html"><span class="flow-card__label">Approved</span><div class="flow-card__title">Trip request</div></a>
+    </div>
+    <div class="flow-row" style="margin-top:12px">
+      <a class="flow-card" href="screens/driver-earnings.html"><span class="flow-card__label">Driver</span><div class="flow-card__title">Earnings</div></a>
+    </div>
+  </section>
+
+  <section class="hub__section">
+    <h2>Admin &amp; Dispatcher</h2>
+    <div class="flow-row">
+      <a class="flow-card" href="screens/admin-dashboard.html"><span class="flow-card__label">Admin</span><div class="flow-card__title">Analytics</div></a>
+      <span class="flow-arrow">→</span>
+      <a class="flow-card" href="screens/admin-pricing-surge.html"><span class="flow-card__label">Admin (new)</span><div class="flow-card__title">Pricing &amp; surge</div></a>
+    </div>
+    <div class="flow-row" style="margin-top:12px">
+      <a class="flow-card" href="screens/dispatcher-live-ops.html"><span class="flow-card__label">Dispatcher</span><div class="flow-card__title">Live operations</div></a>
+    </div>
+  </section>
+
+  <section class="hub__section">
+    <h2>Design tokens preview</h2>
+    <div class="hub__tokens">
+      <div class="token-swatch"><div class="token-swatch__color" style="background:#0D9488"></div><div class="token-swatch__label">primary</div></div>
+      <div class="token-swatch"><div class="token-swatch__color" style="background:#0F766E"></div><div class="token-swatch__label">primary-dark</div></div>
+      <div class="token-swatch"><div class="token-swatch__color" style="background:#10B981"></div><div class="token-swatch__label">success</div></div>
+      <div class="token-swatch"><div class="token-swatch__color" style="background:#F59E0B"></div><div class="token-swatch__label">warning</div></div>
+      <div class="token-swatch"><div class="token-swatch__color" style="background:#EF4444"></div><div class="token-swatch__label">error</div></div>
+      <div class="token-swatch"><div class="token-swatch__color" style="background:#0F172A"></div><div class="token-swatch__label">text-primary</div></div>
+      <div class="token-swatch"><div class="token-swatch__color" style="background:#F0FDFA"></div><div class="token-swatch__label">primary-light</div></div>
+      <div class="token-swatch"><div class="token-swatch__color" style="background:#1E293B"></div><div class="token-swatch__label">driver-panel</div></div>
+    </div>
+  </section>
+
+  <div class="hub__legend">
+    <span>Touch targets ≥ 44px</span>
+    <span>Contrast WCAG 2.1 AA</span>
+    <span>iOS SF Pro · Android Roboto · Web Inter</span>
+    <span>4px spacing grid</span>
+  </div>
+  </div>
+</body>
+</html>

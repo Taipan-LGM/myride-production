@@ -1,0 +1,11 @@
+{
+  "name": "@myride/design-system",
+  "version": "1.0.0",
+  "description": "My Ride React component stubs aligned to design tokens",
+  "private": true,
+  "main": "src/index.ts",
+  "types": "src/index.ts",
+  "peerDependencies": {
+    "react": ">=18.0.0"
+  }
+}

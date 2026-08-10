@@ -1,0 +1,107 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>My Ride — Driver App (Live Motion)</title>
+  <link rel="stylesheet" href="shared-motion.css">
+  <style>
+    body { margin: 0; font-family: var(--font); background: #030810; display: flex; flex-direction: column; align-items: center; min-height: 100vh; padding: 32px 20px; }
+    .label { color: rgba(255,255,255,0.5); font-size: 12px; font-weight: 700; letter-spacing: 0.15em; text-transform: uppercase; }
+    h1 { color: #fff; font-size: 28px; margin: 8px 0 4px; font-weight: 800; }
+    .sub { color: var(--mr-cyan); font-size: 14px; margin: 0 0 20px; }
+    .screen-inner { background: var(--mr-gradient-hero); display: flex; flex-direction: column; }
+    .header { padding: 48px 20px 12px; }
+    .earnings { font-family: var(--font-mono); font-size: 44px; font-weight: 800; color: #fff; line-height: 1; }
+    .tick { display: inline-block; animation: tick-up 2.2s ease infinite; }
+    .toggle { margin: 0 18px; padding: 5px; background: rgba(255,255,255,0.08); border-radius: 14px; display: flex; }
+    .toggle button { flex: 1; padding: 12px; border: none; border-radius: 10px; font-family: var(--font); font-weight: 800; font-size: 13px; cursor: pointer; }
+    .on { background: var(--mr-gradient-cta); color: var(--mr-primary); box-shadow: 0 0 24px rgba(0,212,170,0.45); }
+    .off { background: transparent; color: rgba(255,255,255,0.45); }
+    .request { margin: 14px 18px; padding: 18px; background: rgba(255,255,255,0.07); border: 2px solid rgba(255,107,53,0.5); border-radius: 20px; animation: slide-up 0.5s var(--ease-decel) both; }
+    .nav-box { flex: 1; margin: 0 18px 12px; border-radius: 18px; overflow: hidden; min-height: 180px; border: 1px solid rgba(0,212,170,0.2); }
+    .breakdown { margin: 0 18px 12px; padding: 14px; background: rgba(255,255,255,0.05); border-radius: 14px; }
+    .row { display: flex; justify-content: space-between; padding: 8px 0; font-size: 13px; color: rgba(255,255,255,0.85); }
+    .row span:last-child { font-family: var(--font-mono); font-weight: 700; color: var(--mr-mint); }
+    .bottom-nav { display: flex; justify-content: space-around; padding: 12px 0 28px; background: rgba(0,0,0,0.35); }
+    .bottom-nav div { font-size: 11px; font-weight: 700; color: rgba(255,255,255,0.4); }
+    .bottom-nav div.active { color: var(--mr-cyan); }
+  </style>
+</head>
+<body>
+  <p class="label">App 2 of 3 — Driver · Mobile-first</p>
+  <h1>Driver App — Trip & Earnings</h1>
+  <p class="sub">Ticking earnings · accept countdown · live nav route · heatmap</p>
+
+  <div class="phone-frame">
+    <div class="screen-inner">
+      <div class="header">
+        <div style="display:flex;justify-content:space-between;align-items:flex-start">
+          <div>
+            <div style="font-size:11px;color:rgba(255,255,255,0.5);font-weight:700;text-transform:uppercase;letter-spacing:.12em">Today's earnings</div>
+            <div class="earnings">R<span class="tick" id="earn">2,847</span></div>
+            <div style="font-size:12px;color:var(--mr-mint);margin-top:6px;font-weight:700">↑ R185 since last trip</div>
+          </div>
+          <span class="live-badge">Online</span>
+        </div>
+      </div>
+
+      <div class="toggle">
+        <button class="on">● ONLINE</button>
+        <button class="off">Offline</button>
+      </div>
+
+      <div class="request">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
+          <span style="font-size:10px;font-weight:800;color:var(--mr-accent);letter-spacing:.1em">NEW REQUEST · <span id="cd">0:24</span></span>
+          <svg width="44" height="44" viewBox="0 0 44 44">
+            <circle cx="22" cy="22" r="18" fill="none" stroke="rgba(255,107,53,0.25)" stroke-width="3"/>
+            <circle cx="22" cy="22" r="18" fill="none" stroke="#FF6B35" stroke-width="3" stroke-dasharray="113" stroke-linecap="round" transform="rotate(-90 22 22)">
+              <animate attributeName="stroke-dashoffset" from="113" to="0" dur="24s" repeatCount="indefinite"/>
+            </circle>
+          </svg>
+        </div>
+        <div style="color:#fff;font-weight:800;font-size:17px;margin-bottom:4px">Sandton → OR Tambo T1</div>
+        <div style="color:rgba(255,255,255,0.55);font-size:12px;margin-bottom:14px">18.4 km · 22 min · R333 estimated</div>
+        <div style="display:flex;gap:10px">
+          <button style="flex:1;padding:14px;border-radius:12px;border:2px solid rgba(255,255,255,0.2);background:transparent;color:#fff;font-weight:700;font-family:var(--font)">Decline</button>
+          <button class="btn-glow" style="flex:1.3;padding:14px;font-size:14px">Accept Trip</button>
+        </div>
+      </div>
+
+      <div class="nav-box">
+        <svg width="100%" height="100%" viewBox="0 0 354 200" preserveAspectRatio="xMidYMid slice">
+          <rect width="354" height="200" fill="#061828"/>
+          <path id="nav" d="M28 170 Q95 110 175 80 T330 35" stroke="#153A5C" stroke-width="22" fill="none"/>
+          <path d="M28 170 Q95 110 175 80 T330 35" stroke="url(#ng)" stroke-width="4" fill="none" stroke-dasharray="320" stroke-linecap="round">
+            <animate attributeName="stroke-dashoffset" from="320" to="0" dur="4s" repeatCount="indefinite"/>
+          </path>
+          <defs><linearGradient id="ng" x1="0" y1="0" x2="1" y2="0"><stop stop-color="#00D4AA"/><stop offset="1" stop-color="#00E5C8"/></linearGradient></defs>
+          <circle r="9" fill="#00D4AA" filter="url(#g)"><animateMotion dur="5s" repeatCount="indefinite"><mpath href="#nav"/></animateMotion></circle>
+          <defs><filter id="g"><feGaussianBlur stdDeviation="2"/></filter></defs>
+          <text x="14" y="26" fill="rgba(255,255,255,0.8)" font-family="Inter" font-size="11" font-weight="800">TURN RIGHT · 400 m</text>
+        </svg>
+      </div>
+
+      <div class="breakdown">
+        <div style="font-size:13px;font-weight:800;color:#fff;margin-bottom:6px">Earnings breakdown</div>
+        <div class="row"><span>Trip fares (8)</span><span id="fares">R2,442</span></div>
+        <div class="row"><span>Tips (3)</span><span>R287</span></div>
+        <div class="row"><span>Bonuses</span><span>R118</span></div>
+      </div>
+
+      <div class="bottom-nav">
+        <div class="active">Home</div>
+        <div>Earnings</div>
+        <div>Profile</div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    let e = 2847, cd = 24;
+    setInterval(() => { if (Math.random() > 0.35) { e += 1; document.getElementById('earn').textContent = e.toLocaleString(); } }, 2200);
+    setInterval(() => { if (cd > 0) { cd--; document.getElementById('cd').textContent = '0:' + String(cd).padStart(2,'0'); } }, 1000);
+  </script>
+</body>
+</html>

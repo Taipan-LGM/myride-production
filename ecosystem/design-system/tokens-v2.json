@@ -1,0 +1,92 @@
+{
+  "$schema": "https://design-tokens.github.io/community-group/format/",
+  "meta": {
+    "name": "My Ride Design System",
+    "version": "2.1.0",
+    "description": "WCAG 2.1 AA — Midnight Navy / Electric Mint / Coral Burst"
+  },
+  "color": {
+    "primary": { "value": "#0A2540", "type": "color", "description": "Midnight Navy — headers, nav, primary actions" },
+    "secondary": { "value": "#00D4AA", "type": "color", "description": "Electric Mint — CTAs, success, driver online" },
+    "accent": { "value": "#FF6B35", "type": "color", "description": "Coral Burst — alerts, promos, urgent" },
+    "neutral": {
+      "100": { "value": "#F6F9FC", "type": "color", "description": "Backgrounds" },
+      "900": { "value": "#1A1A1A", "type": "color", "description": "Primary text" }
+    },
+    "brand": {
+      "navy": { "value": "#0A2540", "type": "color" },
+      "navy-mid": { "value": "#0F3152", "type": "color" },
+      "mint": { "value": "#00D4AA", "type": "color" },
+      "coral": { "value": "#FF6B35", "type": "color" },
+      "route-line": { "value": "#00E5C8", "type": "color", "description": "Map route highlights" }
+    },
+    "semantic": {
+      "success": { "value": "#00D4AA", "type": "color" },
+      "warning": { "value": "#FFB020", "type": "color" },
+      "error": { "value": "#FF4757", "type": "color" },
+      "info": { "value": "#00D4AA", "type": "color" }
+    },
+    "surface": {
+      "background": { "value": "#F6F9FC", "type": "color" },
+      "card": { "value": "#FFFFFF", "type": "color" },
+      "map-dark": { "value": "#0A2540", "type": "color" },
+      "map-road": { "value": "#153A5C", "type": "color" }
+    },
+    "text": {
+      "primary": { "value": "#1A1A1A", "type": "color" },
+      "secondary": { "value": "#5A6B82", "type": "color" },
+      "inverse": { "value": "#F6F9FC", "type": "color" },
+      "on-secondary": { "value": "#0A2540", "type": "color" }
+    }
+  },
+  "typography": {
+    "fontFamily": {
+      "sans": { "value": "'Inter', system-ui, sans-serif", "type": "fontFamily" },
+      "mono": { "value": "'Roboto Mono', 'SF Mono', monospace", "type": "fontFamily" }
+    },
+    "fontSize": {
+      "h1": { "value": "32px", "type": "dimension" },
+      "body": { "value": "16px", "type": "dimension" },
+      "caption": { "value": "12px", "type": "dimension" }
+    },
+    "h1": {
+      "fontSize": { "value": "32px" },
+      "fontWeight": { "value": "700" },
+      "letterSpacing": { "value": "-0.5px" }
+    },
+    "body": {
+      "fontSize": { "value": "16px" },
+      "fontWeight": { "value": "400" },
+      "lineHeight": { "value": "1.5" }
+    }
+  },
+  "spacing": {
+    "unit": { "value": "4px", "type": "dimension" },
+    "scale": { "value": [4, 8, 12, 16, 24, 32, 48, 64], "type": "dimension" }
+  },
+  "radius": {
+    "button": { "value": "12px", "type": "dimension" },
+    "card": { "value": "16px", "type": "dimension" }
+  },
+  "elevation": {
+    "card": { "value": "0 4px 12px rgba(10, 37, 64, 0.08)", "type": "shadow" }
+  },
+  "button": {
+    "primary": {
+      "height": { "value": "48px" },
+      "radius": { "value": "12px" },
+      "background": { "value": "#00D4AA" },
+      "text": { "value": "#0A2540" }
+    },
+    "secondary": {
+      "height": { "value": "48px" },
+      "radius": { "value": "12px" },
+      "border": { "value": "2px solid #0A2540" }
+    }
+  },
+  "accessibility": {
+    "contrast": { "value": "WCAG 2.1 AA 4.5:1", "type": "string" },
+    "minTouchTarget": { "value": "44px", "type": "dimension" },
+    "reducedMotion": { "value": "prefers-reduced-motion", "type": "string" }
+  }
+}

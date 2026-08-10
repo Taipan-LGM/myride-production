@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 services:
   - type: web
     name: myride-ecosystem
@@ -15,3 +16,96 @@ services:
         value: /tmp/myride.db
       - key: MYRIDE_ALLOWED_ORIGINS
         value: https://myride-ecosystem.onrender.com
+=======
+# My Ride — Render Blueprint (FastAPI ecosystem)
+# https://render.com/docs/infrastructure-as-code
+#
+# Apply: Dashboard → New → Blueprint → repo Taipan-LGM/My-Ride (master)
+#
+# After apply, set Dashboard secrets marked sync: false.
+# Docs:
+#   docs/RENDER_LEGACY.md
+#   ecosystem/docs/RENDER_ECOSYSTEM.md
+#   ecosystem/docs/CUTOVER.md
+
+databases:
+  - name: myride-pg
+    plan: basic-256mb
+    databaseName: myride
+    user: myride
+
+services:
+  # FastAPI ecosystem hub (Docker)
+  - type: web
+    name: my-ride-ecosystem
+    runtime: docker
+    plan: starter
+    dockerfilePath: ./ecosystem/backend/Dockerfile
+    dockerContext: ./ecosystem/backend
+    healthCheckPath: /health
+    envVars:
+      - key: ENVIRONMENT
+        value: production
+      - key: DEBUG
+        value: "false"
+      - key: LOG_LEVEL
+        value: info
+      - key: STRIPE_CURRENCY
+        value: zar
+      - key: STRIPE_CONNECT_ZA_APPROVED
+        value: "false"
+      # Dual-write soaked (redis+postgres connected on staging) — promote Postgres
+      - key: USE_POSTGRES_PRIMARY
+        value: "true"
+      - key: ALLOW_PHASE0_SEED
+        value: "false"
+      - key: JWT_SECRET
+        generateValue: true
+      - key: DATABASE_URL
+        fromDatabase:
+          name: myride-pg
+          property: connectionString
+      - key: REDIS_URL
+        fromService:
+          name: myride-redis
+          type: redis
+          property: connectionString
+      # Defaults match current Render hostname; override if custom domain is attached.
+      # App also derives HTTPS from RENDER_EXTERNAL_URL when these are empty/localhost.
+      - key: PUBLIC_BASE_URL
+        value: https://my-ride-ecosystem.onrender.com
+      - key: CORS_ORIGINS
+        value: https://my-ride-ecosystem.onrender.com
+      - key: ALLOW_DEMO_ACCOUNTS
+        value: "true"
+      - key: STRIPE_LIVE_SECRET_KEY
+        sync: false
+      - key: STRIPE_WEBHOOK_SECRET
+        sync: false
+      - key: TWILIO_ACCOUNT_SID
+        sync: false
+      - key: TWILIO_AUTH_TOKEN
+        sync: false
+      - key: TWILIO_PHONE_NUMBER
+        sync: false
+      - key: TWILIO_WHATSAPP_NUMBER
+        sync: false
+      - key: OPENAI_API_KEY
+        sync: false
+      - key: STRIPE_TEST_SECRET_KEY
+        sync: false
+      - key: CARTRACK_ENABLED
+        value: "false"
+      - key: CARTRACK_BASE_URL
+        value: https://fleetapi-za.cartrack.com/rest
+      - key: CARTRACK_USERNAME
+        sync: false
+      - key: CARTRACK_API_KEY
+        sync: false
+
+  - type: redis
+    name: myride-redis
+    plan: starter
+    maxmemoryPolicy: allkeys-lru
+    ipAllowList: [] # internal only
+>>>>>>> origin/master

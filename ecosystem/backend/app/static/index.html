@@ -1,0 +1,452 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>My Ride SA — Your Urban Ride, Simplified</title>
+  <link rel="icon" href="/static/brand/my_ride_logo.png" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,400;0,9..40,600;0,9..40,700;1,9..40,400&family=Barlow+Condensed:wght@600;700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <link rel="stylesheet" href="/static/ecosystem.css" />
+</head>
+<body>
+  <!-- LOGIN GATE -->
+  <div id="login-screen" class="login-screen">
+    <div class="login-card">
+      <img class="login-logo" src="/static/brand/my_ride_logo.png" alt="My Ride" />
+      <p class="tagline">…Your Urban Ride, Simplified.</p>
+      <p class="est">Est. 1949</p>
+
+      <div class="role-tabs" role="tablist">
+        <button type="button" class="role-tab active" data-role="rider">Rider</button>
+        <button type="button" class="role-tab" data-role="driver">Driver</button>
+        <button type="button" class="role-tab" data-role="admin">Admin</button>
+      </div>
+
+      <form id="login-form">
+        <label>Email or phone
+          <input id="login-id" type="text" autocomplete="username" required />
+        </label>
+        <label>Password
+          <input id="login-pass" type="password" autocomplete="current-password" required />
+        </label>
+        <button class="btn primary wide" type="submit">Log in</button>
+      </form>
+      <p id="login-error" class="login-error" hidden></p>
+      <div class="demo-hint">
+        <strong>Demo accounts</strong>
+        <code>rider@myride.co.za / ride123</code>
+        <code>driver@myride.co.za / drive123</code>
+        <code>admin@myride.co.za / admin123</code>
+      </div>
+      <img class="login-hero" src="/static/brand/my_ride_hero.png" alt="My Ride taxi" />
+    </div>
+  </div>
+
+  <!-- APP SHELL -->
+  <div id="app-shell" class="shell hidden">
+    <aside class="rail">
+      <div class="brand">
+        <img src="/static/brand/my_ride_logo.png" alt="My Ride" class="brand-logo" />
+      </div>
+      <div class="user-chip">
+        <span id="user-name">—</span>
+        <span id="user-role" class="badge">—</span>
+      </div>
+      <nav id="main-nav"></nav>
+      <div class="rail-foot">
+        <button type="button" class="btn ghost wide" id="btn-settings-nav" data-i18n="settings_title">Settings</button>
+        <button type="button" class="btn ghost wide" id="btn-logout" data-i18n="logout">Log out</button>
+        <a href="/docs" target="_blank">API Docs</a>
+      </div>
+    </aside>
+
+    <main>
+      <section id="view-home" class="view">
+        <header class="hero">
+          <img class="hero-mark" src="/static/brand/my_ride_logo.png" alt="My Ride" />
+          <p class="eyebrow">South Africa · AI-operated</p>
+          <h1>Your Urban Ride,<br />Simplified.</h1>
+          <p class="lede">AI dispatches drivers, prices in ZAR, resolves support, and reconciles payouts — while you ride.</p>
+          <div class="cta-row" id="home-ctas"></div>
+        </header>
+        <div class="hero-band">
+          <img src="/static/brand/my_ride_hero.png" alt="My Ride yellow taxi" />
+        </div>
+        <div class="grid3">
+          <article class="panel"><h3>Omnichannel</h3><p>App · Website · Phone · WhatsApp — one AI dispatcher.</p></article>
+          <article class="panel"><h3>Smart match</h3><p>Multi-factor routing + dynamic ZAR fares + fraud checks.</p></article>
+          <article class="panel"><h3>Zero-touch pay</h3><p>Hold → capture → driver payout reconciliation.</p></article>
+        </div>
+        <section class="channels" id="book-channels">
+          <h2>4 ways to book a My Ride</h2>
+          <p class="lede-sm">Same AI brain. Pick your channel.</p>
+          <div class="channel-grid">
+            <article class="channel-card" data-go="rider">
+              <span class="ch-emoji">📱</span>
+              <h3>App</h3>
+              <p>Flutter Rider app — GPS pickup, live tracking.</p>
+              <button type="button" class="btn ghost" data-go="rider">Open web book</button>
+            </article>
+            <article class="channel-card" data-go="rider">
+              <span class="ch-emoji">💻</span>
+              <h3>Website</h3>
+              <p>This hub — estimate, schedule, AI book.</p>
+              <button type="button" class="btn primary" data-go="rider">Book on web</button>
+            </article>
+            <article class="channel-card" data-go="channels">
+              <span class="ch-emoji">📞</span>
+              <h3>Phone</h3>
+              <p>Call &amp; speak destination — AI books for you.</p>
+              <button type="button" class="btn ghost" data-go="channels">Phone / simulate</button>
+            </article>
+            <article class="channel-card" data-go="channels">
+              <span class="ch-emoji">💬</span>
+              <h3>WhatsApp</h3>
+              <p>Message pickup → dropoff — instant AI reply.</p>
+              <button type="button" class="btn ghost" data-go="channels">WhatsApp / simulate</button>
+            </article>
+          </div>
+        </section>
+        <div class="status-bar" id="home-status">Checking API…</div>
+      </section>
+
+      <section id="view-channels" class="view">
+        <header class="view-head">
+          <img class="mini-logo" src="/static/brand/my_ride_logo.png" alt="" />
+          <div><h2>Book via WhatsApp or Phone Call</h2><p>App · Website · Phone · WhatsApp</p></div>
+        </header>
+        <div class="stack" style="max-width:520px">
+          <div id="channel-info" class="panel">Loading channel numbers…</div>
+          <label>Simulate phone (say destination)
+            <input id="sim-voice-text" value="Book a ride from Cape Town CBD to the Waterfront" />
+          </label>
+          <button class="btn primary" id="btn-sim-voice" type="button">📞 Simulate phone booking</button>
+          <label>Simulate WhatsApp message
+            <input id="sim-wa-text" value="Hi, book me from Sandton to OR Tambo please" />
+          </label>
+          <button class="btn primary" id="btn-sim-wa" type="button">💬 Simulate WhatsApp booking</button>
+          <pre class="out tall" id="channels-out">Channel replies appear here.</pre>
+        </div>
+      </section>
+
+      <section id="view-rider" class="view">
+        <header class="view-head">
+          <img class="mini-logo" src="/static/brand/my_ride_logo.png" alt="" />
+          <div>
+            <h2 data-i18n="book_title">Book a ride</h2>
+            <p data-i18n="book_sub">Type addresses · OpenStreetMap autofill · live ZAR fare</p>
+          </div>
+        </header>
+        <div class="split">
+          <div id="map-rider" class="map"></div>
+          <div class="stack">
+            <div class="place-field">
+              <label data-i18n="pickup">Pickup</label>
+              <div class="place-row">
+                <input id="pickup-input" type="text" autocomplete="street-address"
+                  data-i18n-placeholder="pickup_ph"
+                  placeholder="Type house number + street (OpenStreetMap)" />
+                <button type="button" class="btn ghost icon-btn" id="btn-current-location" title="Current location">📍</button>
+              </div>
+              <ul id="pickup-suggest" class="suggest-list" hidden></ul>
+              <p id="loc-status" class="loc-status" hidden></p>
+            </div>
+            <div class="place-field">
+              <label data-i18n="dropoff">Dropoff</label>
+              <input id="dropoff-input" type="text" autocomplete="street-address"
+                data-i18n-placeholder="dropoff_ph"
+                placeholder="Type house number + street (OpenStreetMap)" />
+              <ul id="dropoff-suggest" class="suggest-list" hidden></ul>
+            </div>
+            <div id="addr-confirm" class="addr-confirm" hidden></div>
+            <div class="place-chips" id="saved-place-chips" hidden></div>
+            <details class="presets">
+              <summary data-i18n="quick_presets">Quick presets</summary>
+              <label>Pickup preset
+                <select id="pickup-preset">
+                  <option value="-33.9249,18.4241">Cape Town CBD</option>
+                  <option value="-33.9180,18.4232">V&A Waterfront</option>
+                  <option value="-33.9640,18.6030">Cape Town Airport</option>
+                  <option value="-26.2041,28.0473">Johannesburg CBD</option>
+                  <option value="-26.1076,28.0567">Sandton</option>
+                  <option value="-26.1367,28.2411">OR Tambo</option>
+                  <option value="-25.7479,28.2293">Pretoria</option>
+                  <option value="-29.8587,31.0218">Durban</option>
+                </select>
+              </label>
+              <label>Dropoff preset
+                <select id="dropoff-preset">
+                  <option value="-33.9180,18.4232">V&A Waterfront</option>
+                  <option value="-33.9640,18.6030">Cape Town Airport</option>
+                  <option value="-33.9249,18.4241">Cape Town CBD</option>
+                  <option value="-26.1367,28.2411">OR Tambo</option>
+                  <option value="-26.1076,28.0567">Sandton</option>
+                  <option value="-26.2041,28.0473">Johannesburg CBD</option>
+                </select>
+              </label>
+            </details>
+            <label data-i18n="vehicle">Vehicle
+              <select id="vehicle-type">
+                <option value="standard">Standard</option>
+                <option value="premium">Premium</option>
+                <option value="van">Van / XL</option>
+              </select>
+            </label>
+            <label>Schedule for (optional)
+              <input id="schedule-for" type="datetime-local" />
+            </label>
+            <div class="cta-row rider-actions">
+              <button type="button" class="btn primary" id="btn-estimate">Estimate fare</button>
+              <button type="button" class="btn primary" id="btn-book">Book with AI</button>
+              <button type="button" class="btn schedule" id="btn-schedule">Schedule ride</button>
+            </div>
+            <div class="cta-row">
+              <label>Rate trip (1–5)
+                <input id="rate-stars" type="number" min="1" max="5" value="5" style="width:4rem" />
+              </label>
+              <button class="btn ghost" id="btn-rate">Rate last trip</button>
+            </div>
+            <pre class="out" id="rider-out">Fare & booking details appear here.</pre>
+          </div>
+        </div>
+      </section>
+
+      <section id="view-driver" class="view">
+        <header class="view-head">
+          <img class="mini-logo" src="/static/brand/my_ride_logo.png" alt="" />
+          <div><h2>Driver</h2><p>Go online · AI offers · earnings · complete trips</p></div>
+        </header>
+        <div class="split">
+          <div id="map-driver" class="map"></div>
+          <div class="stack">
+            <label>Driver ID<input id="driver-id" value="driver-demo-001" /></label>
+            <div class="panel" id="earnings-card">
+              <h3>Today's earnings</h3>
+              <p class="lede-sm" id="earnings-summary">Sign in as driver to load ZAR earnings.</p>
+              <button type="button" class="btn ghost" id="btn-earnings">Refresh earnings</button>
+            </div>
+            <div class="cta-row">
+              <button class="btn primary" id="btn-online">Go online</button>
+              <button class="btn ghost" id="btn-offline">Go offline</button>
+              <button class="btn ghost" id="btn-listen">Listen (WS)</button>
+            </div>
+            <div id="offer-card" class="offer empty">No active offer. Wait for a rider booking.</div>
+            <div class="cta-row">
+              <button class="btn primary" id="btn-accept" disabled>Accept</button>
+              <button class="btn ghost" id="btn-arrived" disabled>Arrived</button>
+              <button class="btn ghost" id="btn-start" disabled>Start</button>
+              <button class="btn ghost" id="btn-complete" disabled>Complete</button>
+            </div>
+            <pre class="out" id="driver-out">Driver events…</pre>
+          </div>
+        </div>
+      </section>
+
+      <section id="view-safety" class="view">
+        <header class="view-head">
+          <img class="mini-logo" src="/static/brand/my_ride_logo.png" alt="" />
+          <div><h2>Safety · SOS</h2><p>Emergency 112 · share live trip · safety ops</p></div>
+        </header>
+        <div class="stack" style="max-width:520px">
+          <div class="panel" id="emergency-card">
+            <h3>South Africa emergency</h3>
+            <p class="lede-sm">Dial <strong>112</strong> immediately if you are in danger.</p>
+            <a class="btn primary" href="tel:112" id="btn-dial-112">Call 112</a>
+          </div>
+          <label>Active trip ID (optional)
+            <input id="sos-trip-id" placeholder="trip id from booking" />
+          </label>
+          <label>Note for safety ops
+            <input id="sos-note" placeholder="Short description" />
+          </label>
+          <div class="cta-row">
+            <button type="button" class="btn primary" id="btn-sos">Trigger SOS</button>
+            <button type="button" class="btn ghost" id="btn-share-trip">Share live trip</button>
+          </div>
+          <pre class="out tall" id="safety-out">Safety actions appear here.</pre>
+        </div>
+      </section>
+
+      <section id="view-wallet" class="view">
+        <header class="view-head">
+          <img class="mini-logo" src="/static/brand/my_ride_logo.png" alt="" />
+          <div><h2>Wallet · Loyalty · Places</h2><p>ZAR balance · points · home &amp; work</p></div>
+        </header>
+        <div class="stack" style="max-width:520px">
+          <div class="panel" id="wallet-card">
+            <h3>Wallet</h3>
+            <p class="lede-sm" id="wallet-balance">—</p>
+            <div class="cta-row">
+              <button type="button" class="btn primary" id="btn-topup">Top up R100</button>
+              <button type="button" class="btn ghost" id="btn-wallet-refresh">Refresh</button>
+            </div>
+          </div>
+          <div class="panel" id="loyalty-card">
+            <h3>Loyalty</h3>
+            <p class="lede-sm" id="loyalty-summary">—</p>
+          </div>
+          <div class="panel">
+            <h3>Saved places</h3>
+            <div class="cta-row">
+              <button type="button" class="btn ghost" id="btn-save-home">Save pickup as Home</button>
+              <button type="button" class="btn ghost" id="btn-save-work">Save dropoff as Work</button>
+            </div>
+            <pre class="out" id="places-out">No saved places yet.</pre>
+          </div>
+          <div class="panel">
+            <h3>Promo · Referral</h3>
+            <label>Promo code
+              <input id="promo-code" placeholder="MYRIDE50" />
+            </label>
+            <div class="cta-row">
+              <button type="button" class="btn primary" id="btn-promo">Redeem</button>
+              <button type="button" class="btn ghost" id="btn-referral">My referral code</button>
+            </div>
+            <pre class="out" id="promo-out">Try MYRIDE50 or SAFLY.</pre>
+          </div>
+          <pre class="out" id="wallet-out">Wallet details…</pre>
+        </div>
+      </section>
+
+      <section id="view-support" class="view">
+        <header class="view-head">
+          <img class="mini-logo" src="/static/brand/my_ride_logo.png" alt="" />
+          <div><h2>AI Support</h2><p>Autonomous help · safety escalates · refund requests reviewed securely</p></div>
+        </header>
+        <div class="chat">
+          <div id="chat-log" class="chat-log"></div>
+          <form id="support-form" class="chat-form">
+            <input id="support-q" placeholder="How can My Ride help?" autocomplete="off" />
+            <button class="btn primary" type="submit">Ask AI</button>
+          </form>
+          <div class="chip-row">
+            <button type="button" class="chip" data-q="Please cancel my ride">Cancel</button>
+            <button type="button" class="chip" data-q="I want a refund for my trip">Refund</button>
+            <button type="button" class="chip" data-q="I lost my phone in the car">Lost item</button>
+            <button type="button" class="chip" data-q="I feel unsafe, the driver is threatening me">Safety</button>
+          </div>
+        </div>
+      </section>
+
+      <section id="view-history" class="view">
+        <header class="view-head">
+          <img class="mini-logo" src="/static/brand/my_ride_logo.png" alt="" />
+          <div><h2>Trip history</h2><p>Your rides · predictive suggestions</p></div>
+        </header>
+        <div class="cta-row">
+          <button class="btn primary" id="btn-history">Refresh history</button>
+          <button class="btn ghost" id="btn-suggestions">AI suggestions</button>
+          <button class="btn ghost" id="btn-insights">Driver insights</button>
+        </div>
+        <pre class="out tall" id="history-out">Sign in and load history…</pre>
+      </section>
+
+      <section id="view-admin" class="view">
+        <header class="view-head">
+          <img class="mini-logo" src="/static/brand/my_ride_logo.png" alt="" />
+          <div><h2>AI Ops</h2><p>Live fleet · revenue · AI resolution</p></div>
+        </header>
+        <div class="metrics" id="metrics-cards"></div>
+        <section class="panel remuneration-panel" aria-labelledby="remuneration-title">
+          <div>
+            <h3 id="remuneration-title">Driver remuneration</h3>
+            <p>Set the driver share for new trips. Existing trip snapshots never change.</p>
+          </div>
+          <form id="remuneration-form" class="remuneration-form">
+            <label for="driver-share-percent">Driver share</label>
+            <div class="remuneration-control">
+              <input id="driver-share-percent" type="number" min="0" max="100" step="0.25" inputmode="decimal" required />
+              <span>%</span>
+              <button class="btn primary" type="submit">Save policy</button>
+            </div>
+            <p id="remuneration-state" class="fleet-state">Loading policy…</p>
+          </form>
+        </section>
+        <section class="panel fleet-panel" aria-labelledby="fleet-title">
+          <div class="fleet-head">
+            <div><h3 id="fleet-title">Cartrack fleet</h3><p>Read-only vehicle telemetry · refreshed every 8 seconds</p></div>
+            <span class="fleet-state" id="fleet-state">Connecting…</span>
+          </div>
+          <div class="map fleet-map" id="map-admin" aria-label="Cartrack vehicle locations"></div>
+          <div class="fleet-list" id="fleet-list"></div>
+        </section>
+        <section class="panel fleet-panel" aria-labelledby="reconciliation-title">
+          <div class="fleet-head">
+            <div>
+              <h3 id="reconciliation-title">Payout reconciliation</h3>
+              <p>Completed and captured trips awaiting a durable driver payout.</p>
+            </div>
+            <span class="fleet-state" id="reconciliation-state">Loading…</span>
+          </div>
+          <div class="fleet-list" id="reconciliation-list"></div>
+        </section>
+        <section class="panel remuneration-panel" aria-labelledby="refund-title">
+          <div>
+            <h3 id="refund-title">Full trip refund</h3>
+            <p>Reverses any driver transfer before refunding the captured rider payment.</p>
+          </div>
+          <form id="refund-form" class="remuneration-form">
+            <label for="refund-trip-id">Trip ID</label>
+            <input id="refund-trip-id" type="text" autocomplete="off" required />
+            <label for="refund-reason">Reason</label>
+            <input id="refund-reason" type="text" value="Customer service recovery" minlength="3" maxlength="200" required />
+            <label class="checkbox-label"><input id="refund-confirm" type="checkbox" required /> Confirm full fare refund and payout reversal</label>
+            <button class="btn primary" type="submit">Refund trip</button>
+            <p id="refund-state" class="fleet-state">Awaiting trip ID</p>
+          </form>
+        </section>
+        <div class="cta-row">
+          <button class="btn primary" id="btn-refresh-metrics">Refresh metrics</button>
+          <button class="btn ghost" id="btn-refresh-fleet">Refresh fleet</button>
+          <button class="btn ghost" id="btn-refresh-reconciliations">Refresh payouts</button>
+          <button class="btn ghost" id="btn-ledger">Payment ledger</button>
+          <button class="btn ghost" id="btn-ml-status">ML status</button>
+          <button class="btn primary" id="btn-ml-train">Train ML</button>
+        </div>
+        <pre class="out tall" id="admin-out">Loading metrics…</pre>
+      </section>
+
+      <section id="view-settings" class="view">
+        <header class="view-head">
+          <img class="mini-logo" src="/static/brand/my_ride_logo.png" alt="" />
+          <div>
+            <h2 data-i18n="settings_title">Settings</h2>
+            <p data-i18n="settings_sub">Theme · Language</p>
+          </div>
+        </header>
+        <div class="stack" style="max-width:420px">
+          <div class="panel" id="driver-payout-panel" hidden>
+            <h3>Payout account</h3>
+            <p class="lede-sm" id="driver-payout-summary">Checking payout status…</p>
+            <div class="cta-row">
+              <button type="button" class="btn primary" id="btn-connect-payouts">Set up payouts</button>
+              <button type="button" class="btn ghost" id="btn-refresh-payouts">Refresh status</button>
+            </div>
+            <p id="driver-payout-state" class="fleet-state">Not connected</p>
+          </div>
+          <div class="panel">
+            <h3 data-i18n="theme">Theme</h3>
+            <div class="seg" id="theme-seg">
+              <button type="button" class="seg-btn" data-theme="light" data-i18n="theme_light">Light</button>
+              <button type="button" class="seg-btn" data-theme="dark" data-i18n="theme_dark">Dark</button>
+            </div>
+          </div>
+          <div class="panel">
+            <h3 data-i18n="language">Language</h3>
+            <div class="seg" id="lang-seg">
+              <button type="button" class="seg-btn" data-lang="en">English</button>
+              <button type="button" class="seg-btn" data-lang="af">Afrikaans</button>
+            </div>
+          </div>
+          <p class="lede-sm" data-i18n="settings_hint">Choices save on this device.</p>
+        </div>
+      </section>
+    </main>
+  </div>
+
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <script src="/static/ecosystem.js"></script>
+</body>
+</html>

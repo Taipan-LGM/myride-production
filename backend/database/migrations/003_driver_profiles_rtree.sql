@@ -1,0 +1,2 @@
+-- Reference migration — see 003_add_rtree_index.sql (canonical).
+-- Boot applies triggers via backend/database/rtree.js (schema_migrations tracked).

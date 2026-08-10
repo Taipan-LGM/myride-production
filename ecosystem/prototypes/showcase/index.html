@@ -1,0 +1,74 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>My Ride — Complete Ecosystem Hub</title>
+  <link rel="stylesheet" href="shared-motion.css">
+  <style>
+    body { margin: 0; font-family: var(--font); background: var(--mr-gradient-hero); min-height: 100vh; color: #fff; }
+    .hero { text-align: center; padding: 48px 24px 32px; }
+    .hero h1 { font-size: 40px; font-weight: 800; margin: 0 0 8px; letter-spacing: -0.5px; }
+    .hero p { color: var(--mr-cyan); font-size: 16px; margin: 0; }
+    .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 28px; max-width: 1280px; margin: 0 auto; padding: 0 32px 48px; }
+    .card { background: rgba(255,255,255,0.06); border: 1px solid rgba(0,212,170,0.2); border-radius: 24px; padding: 28px; transition: transform 250ms var(--ease-spring), box-shadow 250ms; }
+    .card:hover { transform: translateY(-6px); box-shadow: 0 24px 48px rgba(0,0,0,0.35), 0 0 40px rgba(0,212,170,0.15); }
+    .card .tag { font-size: 10px; font-weight: 800; letter-spacing: 0.14em; text-transform: uppercase; color: var(--mr-secondary); }
+    .card h2 { font-size: 24px; margin: 8px 0 12px; font-weight: 800; }
+    .card p { font-size: 14px; color: rgba(255,255,255,0.65); line-height: 1.6; margin: 0 0 20px; }
+    .card a { display: inline-block; text-decoration: none; }
+    .motion-list { font-size: 12px; color: rgba(255,255,255,0.5); margin: 16px 0 0; padding-left: 18px; line-height: 1.8; }
+    .ds-link { text-align: center; padding-bottom: 40px; }
+    .ds-link a { color: var(--mr-cyan); font-weight: 700; }
+  </style>
+</head>
+<body>
+  <div class="hero">
+    <div class="live-badge" style="justify-content:center;margin-bottom:12px">Complete ecosystem</div>
+    <h1>My Ride</h1>
+    <p>Rider · Driver · Admin — professional motion design system</p>
+  </div>
+
+  <div class="grid">
+    <div class="card">
+      <div class="tag">App 1 — Mobile</div>
+      <h2>Rider App</h2>
+      <p>Live dark-map tracking, pulsing ETA, tier fare cards, breathing Confirm CTA, SOS pulse, auto-moving ride progress.</p>
+      <a href="rider-live.html" class="btn-glow">Open Rider Live →</a>
+      <ul class="motion-list">
+        <li>Car icon animateMotion 6s loop</li>
+        <li>Route dash draw 3s</li>
+        <li>ETA countdown + color pulse</li>
+      </ul>
+    </div>
+
+    <div class="card">
+      <div class="tag">App 2 — Mobile</div>
+      <h2>Driver App</h2>
+      <p>Ticking earnings counter, online glow toggle, trip request countdown ring, accept CTA breathe, live nav route animation.</p>
+      <a href="driver-live.html" class="btn-glow">Open Driver Live →</a>
+      <ul class="motion-list">
+        <li>Earnings tick every 2.2s</li>
+        <li>Accept ring 24s countdown</li>
+        <li>Nav car 5s path loop</li>
+      </ul>
+    </div>
+
+    <div class="card">
+      <div class="tag">App 3 — Desktop Web</div>
+      <h2>Admin Dashboard</h2>
+      <p>Live KPI stream, staggered bar chart grow, revenue line draw, fleet pin blink, donut availability, activity feed injection.</p>
+      <a href="admin-live.html" class="btn-glow">Open Admin Live →</a>
+      <ul class="motion-list">
+        <li>KPIs update every 2.5s</li>
+        <li>Chart bars stagger 0.08s</li>
+        <li>Feed rows slide-up</li>
+      </ul>
+    </div>
+  </div>
+
+  <div class="ds-link">
+    <a href="DESIGN_SYSTEM.md">View Design System & Motion Guide →</a>
+  </div>
+</body>
+</html>

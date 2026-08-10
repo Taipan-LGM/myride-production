@@ -1,0 +1,18 @@
+# Flutter build artifacts
+.dart_tool/
+.packages
+build/
+.flutter-plugins
+.flutter-plugins-dependencies
+.pub-cache/
+pubspec.lock
+
+# IDE
+.idea/
+*.iml
+
+# Secrets — never commit
+.env
+google-services.json
+GoogleService-Info.plist
+**/firebase_options.local.dart

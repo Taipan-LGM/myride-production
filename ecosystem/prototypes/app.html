@@ -1,0 +1,283 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>My Ride App</title>
+  <link rel="stylesheet" href="shared.css">
+  <style>
+    body.app-launcher {
+      margin: 0;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      background: linear-gradient(160deg, #0f766e 0%, #0d9488 40%, #f8fafc 40%);
+      padding: 24px 16px;
+      gap: 20px;
+    }
+
+    .app-launcher__header {
+      text-align: center;
+      color: #fff;
+      max-width: 420px;
+    }
+
+    .app-launcher__header h1 {
+      margin: 8px 0 4px;
+      font-size: 1.5rem;
+      font-weight: 700;
+    }
+
+    .app-launcher__header p {
+      margin: 0;
+      font-size: 0.9rem;
+      opacity: 0.9;
+    }
+
+    .phone {
+      width: min(390px, 100%);
+      background: #0f172a;
+      border-radius: 44px;
+      padding: 12px;
+      box-shadow: 0 32px 64px rgba(15, 23, 42, 0.35);
+    }
+
+    .phone__screen {
+      background: #f8fafc;
+      border-radius: 34px;
+      overflow: hidden;
+      min-height: 720px;
+      display: flex;
+      flex-direction: column;
+    }
+
+    .phone__notch {
+      height: 28px;
+      background: #f8fafc;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .phone__notch span {
+      width: 96px;
+      height: 22px;
+      background: #0f172a;
+      border-radius: 0 0 14px 14px;
+    }
+
+    .phone__content {
+      flex: 1;
+      overflow: auto;
+    }
+
+    .phone__content iframe {
+      width: 100%;
+      height: 100%;
+      min-height: 680px;
+      border: 0;
+      display: block;
+    }
+
+    /* Hub (matches Flutter HubScreen) */
+    .mr-hub {
+      padding: 24px;
+      min-height: 680px;
+      display: flex;
+      flex-direction: column;
+    }
+
+    .mr-hub__brand {
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: 0.12em;
+      color: var(--mr-color-brand-primary);
+      margin: 0 0 8px;
+    }
+
+    .mr-hub__title {
+      font-size: 28px;
+      font-weight: 700;
+      margin: 0 0 8px;
+      color: var(--mr-color-text-primary);
+    }
+
+    .mr-hub__subtitle {
+      font-size: 15px;
+      color: var(--mr-color-text-secondary);
+      margin: 0 0 32px;
+      line-height: 1.5;
+    }
+
+    .mr-hub-card {
+      display: flex;
+      align-items: center;
+      gap: 16px;
+      padding: 16px;
+      margin-bottom: 16px;
+      background: #fff;
+      border: 1px solid var(--mr-color-border-default);
+      border-radius: 12px;
+      cursor: pointer;
+      text-align: left;
+      width: 100%;
+      font: inherit;
+      color: inherit;
+      transition: background 0.15s;
+    }
+
+    .mr-hub-card:hover {
+      background: var(--mr-color-brand-primary-light);
+    }
+
+    .mr-hub-card__icon {
+      width: 56px;
+      height: 56px;
+      border-radius: 50%;
+      background: var(--mr-color-brand-primary-light);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 28px;
+      flex-shrink: 0;
+    }
+
+    .mr-hub-card__title {
+      font-size: 18px;
+      font-weight: 600;
+      margin: 0 0 4px;
+    }
+
+    .mr-hub-card__meta {
+      font-size: 13px;
+      color: var(--mr-color-text-secondary);
+      margin: 0;
+    }
+
+    .mr-hub-card__chevron {
+      margin-left: auto;
+      color: var(--mr-color-text-tertiary);
+      font-size: 20px;
+    }
+
+    .mr-hub__footer {
+      margin-top: auto;
+      font-size: 12px;
+      color: var(--mr-color-text-tertiary);
+    }
+
+    .app-launcher__links {
+      display: flex;
+      gap: 12px;
+      flex-wrap: wrap;
+      justify-content: center;
+    }
+
+    .app-launcher__links a {
+      color: #fff;
+      font-size: 13px;
+      text-decoration: none;
+      padding: 8px 14px;
+      border: 1px solid rgba(255,255,255,0.4);
+      border-radius: 999px;
+    }
+
+    .app-launcher__links a:hover {
+      background: rgba(255,255,255,0.15);
+    }
+
+    .screen-topbar { display: none !important; }
+    .screen-footer { display: none !important; }
+    .screen-shell { min-height: auto; }
+    .screen-canvas { padding: 0; }
+    .screen-canvas svg { box-shadow: none; border-radius: 0; }
+  </style>
+</head>
+<body class="app-launcher">
+  <div class="app-launcher__header">
+    <p class="mr-hub__brand" style="color:#99f6e4">MY RIDE</p>
+    <h1>Mobile App Preview</h1>
+    <p>Interactive preview of the Rider &amp; Driver apps. Pick a journey below.</p>
+  </div>
+
+  <div class="phone">
+    <div class="phone__screen">
+      <div class="phone__notch"><span></span></div>
+      <div class="phone__content" id="phone-content">
+        <div class="mr-hub" id="hub">
+          <p class="mr-hub__brand">MY RIDE</p>
+          <h2 class="mr-hub__title">E-hailing ecosystem</h2>
+          <p class="mr-hub__subtitle">Choose a journey to preview the app.</p>
+
+          <button type="button" class="mr-hub-card" data-src="screens/rider-onboarding-phone.html">
+            <div class="mr-hub-card__icon">🧑</div>
+            <div>
+              <p class="mr-hub-card__title">Rider app</p>
+              <p class="mr-hub-card__meta">Onboarding → book → live trip → receipt → wallet</p>
+            </div>
+            <span class="mr-hub-card__chevron">›</span>
+          </button>
+
+          <button type="button" class="mr-hub-card" data-src="screens/driver-kyc-personal.html">
+            <div class="mr-hub-card__icon">🚕</div>
+            <div>
+              <p class="mr-hub-card__title">Driver app</p>
+              <p class="mr-hub-card__meta">KYC → trip request → earnings</p>
+            </div>
+            <span class="mr-hub-card__chevron">›</span>
+          </button>
+
+          <button type="button" class="mr-hub-card" data-src="screens/rider-home.html">
+            <div class="mr-hub-card__icon">🗺️</div>
+            <div>
+              <p class="mr-hub-card__title">Skip to Rider Home</p>
+              <p class="mr-hub-card__meta">Map, vehicle picker, book a ride</p>
+            </div>
+            <span class="mr-hub-card__chevron">›</span>
+          </button>
+
+          <p class="mr-hub__footer">Flutter build: ecosystem/frontend/</p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="app-launcher__links">
+    <a href="#" id="back-to-hub">← Back to hub</a>
+    <a href="index.html">Flow map (all screens)</a>
+  </div>
+
+  <script>
+    const content = document.getElementById('phone-content');
+    const hub = document.getElementById('hub');
+    const backLink = document.getElementById('back-to-hub');
+
+    function loadScreen(src) {
+      content.innerHTML = '<iframe src="' + src + '" title="My Ride screen"></iframe>';
+      backLink.style.display = 'inline-block';
+    }
+
+    function showHub() {
+      content.innerHTML = '';
+      content.appendChild(hub);
+      hub.style.display = 'flex';
+      backLink.style.display = 'none';
+    }
+
+    document.querySelectorAll('.mr-hub-card').forEach(function (btn) {
+      btn.addEventListener('click', function () {
+        loadScreen(btn.dataset.src);
+      });
+    });
+
+    backLink.addEventListener('click', function (e) {
+      e.preventDefault();
+      showHub();
+    });
+
+    backLink.style.display = 'none';
+  </script>
+</body>
+</html>

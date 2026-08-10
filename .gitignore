@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 __pycache__/
 *.py[cod]
 .env
@@ -6,3 +7,52 @@ venv/
 data/*.db
 .pytest_cache/
 .coverage
+=======
+node_modules/
+
+# Local env (never commit secrets)
+.env
+.env.prod
+.env.save
+.env.*.local
+**/.env
+**/.env.prod
+**/.env.save
+
+# SQLite DB files + sidecars
+*.sqlite
+*.sqlite3
+*.db
+*.sqlite-shm
+*.sqlite-wal
+
+# Python / Flutter caches
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+**/build/
+**/.dart_tool/
+**/.flutter-plugins
+**/.flutter-plugins-dependencies
+**/data/ml/*.json
+
+# Generated knowledge graphs (rebuild with graphify update)
+graphify-out/
+**/graphify-out/
+
+# Editor / agent local
+.DS_Store
+.vscode/
+.cursor/
+**/.cursor/
+.idea/
+*.iml
+
+# Logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+>>>>>>> origin/master
