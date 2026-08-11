@@ -1,0 +1,5 @@
+# Copy to key.properties and keep the real values outside Git.
+storeFile=C:/secure/path/myride-upload.jks
+storePassword=replace-with-secret
+keyAlias=myride-upload
+keyPassword=replace-with-secret

@@ -27,13 +27,32 @@ class EcosystemAuthApi {
         'role': role,
       }),
     );
+    return _persistLoginResponse(res, fallbackRole: role);
+  }
+
+  Future<AppUser> loginWithFirebase({
+    required String idToken,
+    required String role,
+  }) async {
+    final res = await _client.post(
+      _uri('/auth/firebase'),
+      headers: {'Content-Type': 'application/json'},
+      body: jsonEncode({'id_token': idToken, 'role': role}),
+    );
+    return _persistLoginResponse(res, fallbackRole: role);
+  }
+
+  Future<AppUser> _persistLoginResponse(
+    http.Response res, {
+    required String fallbackRole,
+  }) async {
     final data = jsonDecode(res.body) as Map<String, dynamic>;
     if (res.statusCode >= 400) {
       throw Exception(data['detail']?.toString() ?? 'login_failed');
     }
     final token = data['access_token'] as String? ?? '';
     final userJson = data['user'] as Map<String, dynamic>? ?? {};
-    final roleName = userJson['role'] as String? ?? role;
+    final roleName = userJson['role'] as String? ?? fallbackRole;
     final userRole = switch (roleName) {
       'driver' => UserRole.driver,
       'admin' => UserRole.admin,

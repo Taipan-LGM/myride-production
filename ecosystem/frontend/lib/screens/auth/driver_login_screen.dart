@@ -5,6 +5,7 @@ import 'package:my_ride/services/api/auth_api.dart';
 import 'package:my_ride/theme/mr_tokens.dart';
 import 'package:my_ride/widgets/brand/mr_logo.dart';
 import 'package:my_ride/widgets/common/mr_error_snackbar.dart';
+import 'package:my_ride/widgets/mr_badge.dart';
 
 class DriverLoginScreen extends StatefulWidget {
   const DriverLoginScreen({super.key});
@@ -74,6 +75,14 @@ class _DriverLoginScreenState extends State<DriverLoginScreen> {
                   ),
                   SizedBox(height: 8.h),
                   Text('My Ride Partner', style: TextStyle(fontFamily: 'Inter', fontSize: 16.sp, fontWeight: FontWeight.w500, color: MrColors.secondary)),
+                  SizedBox(height: 8.h),
+                  // Version badge
+                  Center(
+                    child: VersionBadge(
+                      version: '0.3.1',
+                      padding: EdgeInsets.zero,
+                    ),
+                  ),
                   SizedBox(height: 8.h),
                   Text(
                     'Sign in to start earning and manage your trips.',

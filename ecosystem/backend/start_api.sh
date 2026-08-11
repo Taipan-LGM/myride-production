@@ -3,39 +3,42 @@
 set -euo pipefail
 cd "$(dirname "$0")"
 
-export PYTHONPATH="${PWD}:${PYTHONPATH:-}"
+# Unset PYTHONPATH to prevent Hermes venv shadowing project venv
+# Also set PYTHONHOME to ensure we use the correct standard library
+export PYTHONPATH="${PWD}"
 
 if [ ! -f .env ]; then
   cp .env.example .env
   echo "Created .env from .env.example"
 fi
 
-if command -v uv >/dev/null 2>&1; then
-  if [ ! -d .venv ]; then
+# Check if venv exists and has Scripts directory (Windows) or bin directory (Unix)
+if [ -d ".venv/Scripts" ]; then
+  # Windows venv
+  source .venv/Scripts/activate
+elif [ -d ".venv/bin" ]; then
+  # Unix venv
+  source .venv/bin/activate
+else
+  # Try to create venv if it doesn't exist
+  if command -v uv >/dev/null 2>&1; then
     uv venv .venv
   fi
-  # shellcheck disable=SC1091
-  source .venv/bin/activate
-  uv pip install -q -r requirements.txt
-elif [ ! -d .venv ]; then
-  python3 -m venv .venv || {
-    echo "Install python3-venv or uv, then re-run: ./start_api.sh"
+  if [ -d ".venv/Scripts" ]; then
+    source .venv/Scripts/activate
+  elif [ -d ".venv/bin" ]; then
+    source .venv/bin/activate
+  else
+    echo "Could not find venv Scripts or bin directory"
     exit 1
-  }
-  # shellcheck disable=SC1091
-  source .venv/bin/activate
-  pip install -q -r requirements.txt
-else
-  # shellcheck disable=SC1091
-  source .venv/bin/activate
+  fi
 fi
 
 set -a
-# shellcheck disable=SC1091
 source .env
 set +a
 
-API_PORT="${API_PORT:-8000}"
+API_PORT="${API_PORT:-8001}"
 
 if command -v ss >/dev/null 2>&1 && ss -tln 2>/dev/null | grep -qE ":${API_PORT}\b"; then
   if curl -sf "http://127.0.0.1:${API_PORT}/health" >/dev/null 2>&1; then

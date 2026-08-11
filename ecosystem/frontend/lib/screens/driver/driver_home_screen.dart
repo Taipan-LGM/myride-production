@@ -7,7 +7,6 @@ import 'package:go_router/go_router.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:my_ride/bootstrap.dart' as app_bootstrap;
 import 'package:my_ride/config/app_config.dart';
-import 'package:my_ride/core/api/api_config.dart';
 import 'package:my_ride/core/platform/background_location_permission.dart';
 import 'package:my_ride/models/api_models.dart';
 import 'package:my_ride/providers/auth_provider.dart';
@@ -25,6 +24,7 @@ import 'package:my_ride/services/websocket_service.dart';
 import 'package:my_ride/theme/mr_text.dart';
 import 'package:my_ride/theme/mr_tokens.dart';
 import 'package:my_ride/widgets/map/ride_map_widget.dart';
+import 'package:my_ride/widgets/mr_badge.dart';
 import 'package:permission_handler/permission_handler.dart';
 
 /// Driver home — permissions are handled by [DriverPermissionSetupScreen] on first launch.
@@ -80,7 +80,7 @@ class _DriverHomeBodyState extends ConsumerState<_DriverHomeBody> {
     if (!kDebugMode) return;
     final user = ref.read(authProvider).user;
     debugPrint('🟢 User role: ${user?.role}');
-    debugPrint('🟢 Driver id: ${user?.id ?? ApiConfig.defaultDriverId}');
+    debugPrint('🟢 Driver id: ${user?.id}');
     final perm = ref.read(driverPermissionProvider);
     debugPrint('🟢 Background permission granted: ${perm.valueOrNull}');
   }
@@ -96,18 +96,19 @@ class _DriverHomeBodyState extends ConsumerState<_DriverHomeBody> {
         final dropoff = data['dropoff'] as Map<String, dynamic>?;
         ref.read(driverProvider.notifier).setIncoming(IncomingRideRequest(
               tripId: data['ride_id']?.toString() ?? '',
-              riderName: (data['rider_info'] as Map?)?['name'] as String? ?? 'Rider',
+              riderName: (data['rider_info'] as Map<String, dynamic>?)?['name'] as String? ?? 'Rider',
               pickup: pickup?['address'] as String? ?? '',
               dropoff: dropoff?['address'] as String? ?? '',
               fareCents: data['estimated_fare'] as int?,
-              distanceKm: ((data['distance'] as num?) ?? 0) / 1000,
+              distanceKm: (data['distance'] as num? ?? 0) / 1000,
             ));
         _startCountdown();
       });
       return;
     }
 
-    final driverId = ref.read(authProvider).user?.id ?? ApiConfig.defaultDriverId;
+    final driverId = ref.read(authProvider).user?.id;
+    if (driverId == null) return;
     if (kDebugMode) debugPrint('🔌 Driver WebSocket for driver_id=$driverId');
 
     _requestWs?.dispose();
@@ -123,7 +124,7 @@ class _DriverHomeBodyState extends ConsumerState<_DriverHomeBody> {
                 pickup: data['pickup'] as String? ?? '',
                 dropoff: data['dropoff'] as String? ?? '',
                 fareCents: data['fare_cents'] as int?,
-                distanceKm: (data['distance_km'] as num?)?.toDouble(),
+                distanceKm: (data['distance_km'] as num?)?.toDouble() ?? 0.0,
               ));
           _startCountdown();
         }
@@ -188,7 +189,16 @@ class _DriverHomeBodyState extends ConsumerState<_DriverHomeBody> {
 
     ref.read(driverProvider.notifier).toggleOnline(value);
 
-    final driverId = ref.read(authProvider).user?.id ?? ApiConfig.defaultDriverId;
+    final driverId = ref.read(authProvider).user?.id;
+    if (driverId == null) {
+      ref.read(driverProvider.notifier).toggleOnline(false);
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Driver login required')),
+        );
+      }
+      return;
+    }
     try {
       if (AppConfig.legacyBackend) {
         ref.watch(socketConnectionProvider);
@@ -250,8 +260,9 @@ class _DriverHomeBodyState extends ConsumerState<_DriverHomeBody> {
 
   Future<void> _accept(IncomingRideRequest req) async {
     ref.read(driverProvider.notifier).setLoading(true);
-    final driverId = ref.read(authProvider).user?.id ?? ApiConfig.defaultDriverId;
     try {
+      final driverId = ref.read(authProvider).user?.id;
+      if (driverId == null) throw StateError('Driver login required');
       if (AppConfig.legacyBackend) {
         final ride = await RidesApi().acceptRide(req.tripId);
         ref.read(driverProvider.notifier).clearRequest();
@@ -291,6 +302,21 @@ class _DriverHomeBodyState extends ConsumerState<_DriverHomeBody> {
     }
 
     return Scaffold(
+      appBar: AppBar(
+        title: const Text('Driver'),
+        actions: [
+          // Version badge in AppBar
+          Padding(
+            padding: const EdgeInsets.only(right: 16.0),
+            child: VersionBadge(version: '0.3.1'),
+          ),
+          IconButton(
+            tooltip: 'Log out',
+            icon: const Icon(Icons.logout),
+            onPressed: () => context.go('/driver/login'),
+          ),
+        ],
+      ),
       body: IndexedStack(
         index: _tab,
         children: [
@@ -337,7 +363,10 @@ class _DriverHomeBodyState extends ConsumerState<_DriverHomeBody> {
                   request: req,
                   onAccept: () => _accept(req),
                   onReject: () async {
-                    final driverId = ref.read(authProvider).user?.id ?? ApiConfig.defaultDriverId;
+                    final driverId = ref.read(authProvider).user?.id;
+                    if (driverId == null) {
+                      throw StateError('Driver login required');
+                    }
                     if (AppConfig.legacyBackend) {
                       await RidesApi().rejectRide(req.tripId);
                     } else {
@@ -484,10 +513,12 @@ class _EarningsTabState extends State<_EarningsTab> {
             Text('All time R${_totalZar!.toStringAsFixed(2)} · $_trips trips', style: MrText.sans(size: 14)),
           if (_error != null) ...[
             const SizedBox(height: 12),
-            Text(_error!, style: MrText.sans(size: 12, color: MrColors.error)),
+            Text(_error!, style: TextStyle(color: MrColors.error)),
           ],
+          const SizedBox(height: 24),
+          Text('Recent trips', style: MrText.sans(size: 16, weight: FontWeight.w600)),
           const SizedBox(height: 8),
-          Text('Pull to refresh · 80% driver share', style: MrText.sans(size: 12, color: MrColors.textTertiary)),
+          // Add more trip list items here
         ],
       ),
     );
@@ -498,5 +529,9 @@ class _ProfileTab extends StatelessWidget {
   const _ProfileTab();
 
   @override
-  Widget build(BuildContext context) => const Center(child: Text('Driver profile'));
+  Widget build(BuildContext context) {
+    return const Center(
+      child: Text('Profile tab - not yet implemented'),
+    );
+  }
 }

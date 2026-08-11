@@ -7,6 +7,7 @@ import 'package:my_ride/services/admin_otp_service.dart';
 import 'package:my_ride/services/api/auth_api.dart';
 import 'package:my_ride/theme/mr_tokens.dart';
 import 'package:my_ride/widgets/brand/mr_logo.dart';
+import 'package:my_ride/widgets/mr_badge.dart';
 
 class AdminLoginScreen extends StatefulWidget {
   const AdminLoginScreen({super.key});
@@ -155,7 +156,18 @@ class _AdminLoginScreenState extends State<AdminLoginScreen> {
                 SizedBox(height: 8.h),
                 Text('Admin Console', style: TextStyle(fontFamily: 'Inter', fontSize: 13.sp, fontWeight: FontWeight.w500, color: MrColors.secondary)),
                 SizedBox(height: 48.h),
-                Text('Secure Admin Access', style: TextStyle(fontFamily: 'Inter', fontSize: 28.sp, fontWeight: FontWeight.w700, color: MrColors.primary, letterSpacing: -0.5)),
+                // Version badge
+                Center(
+                  child: VersionBadge(
+                    version: '0.3.1',
+                    padding: EdgeInsets.zero,
+                  ),
+                ),
+                SizedBox(height: 16.h),
+                Text(
+                  'Secure Admin Access',
+                  style: TextStyle(fontFamily: 'Inter', fontSize: 28.sp, fontWeight: FontWeight.w700, color: MrColors.primary, letterSpacing: -0.5),
+                ),
                 SizedBox(height: 12.h),
                 Text(
                   'Enter your email manually. A real 6-digit code will be sent to your inbox.',
@@ -342,7 +354,7 @@ class _AdminLoginScreenState extends State<AdminLoginScreen> {
       enabledBorder: border,
       focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12.r), borderSide: const BorderSide(color: MrColors.secondary, width: 2)),
       disabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12.r), borderSide: BorderSide(color: MrColors.primary.withValues(alpha: 0.1))),
-      errorBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12.r), borderSide: const BorderSide(color: MrColors.accent, width: 2)),
+      errorBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12.r), borderSide: BorderSide(color: MrColors.accent, width: 2)),
       contentPadding: EdgeInsets.symmetric(horizontal: 16.w, vertical: 16.h),
     );
   }

@@ -4,12 +4,15 @@ from __future__ import annotations
 
 import hashlib
 import hmac
+import asyncio
+import json
 import logging
 import time
 from dataclasses import dataclass
+from collections.abc import Callable, Mapping
 from typing import Any, Literal
 
-from fastapi import Depends, HTTPException, status
+from fastapi import Depends, HTTPException, WebSocket, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 
 from app.config import Settings, get_settings
@@ -24,7 +27,7 @@ _bearer = HTTPBearer(auto_error=False)
 @dataclass(frozen=True)
 class AuthUser:
     id: str
-    email: str
+    email: str | None
     name: str
     role: Role
     phone: str | None = None
@@ -131,9 +134,10 @@ def decode_token(token: str, settings: Settings | None = None) -> AuthUser:
     if int(payload.get("exp", 0)) < int(time.time()):
         raise HTTPException(status.HTTP_401_UNAUTHORIZED, "Token expired")
 
+    email = payload.get("email")
     return AuthUser(
         id=str(payload["sub"]),
-        email=str(payload["email"]),
+        email=str(email) if email else None,
         name=str(payload.get("name") or ""),
         role=payload["role"],  # type: ignore[arg-type]
         phone=payload.get("phone"),
@@ -181,6 +185,64 @@ def authenticate(
     )
 
 
+def _verify_firebase_id_token(id_token: str, settings: Settings) -> Mapping[str, Any]:
+    if not settings.firestore_project_id:
+        raise HTTPException(
+            status.HTTP_503_SERVICE_UNAVAILABLE,
+            "Firebase authentication is not configured",
+        )
+
+    from google.auth import exceptions as google_exceptions
+    from google.auth.transport import requests as google_requests
+    from google.oauth2 import id_token as google_id_token
+
+    try:
+        return google_id_token.verify_firebase_token(
+            id_token,
+            google_requests.Request(),
+            audience=settings.firestore_project_id,
+        )
+    except ValueError as exc:
+        raise HTTPException(status.HTTP_401_UNAUTHORIZED, "Invalid Firebase token") from exc
+    except google_exceptions.GoogleAuthError as exc:
+        logger.warning("Firebase token verification unavailable: %s", exc)
+        raise HTTPException(
+            status.HTTP_503_SERVICE_UNAVAILABLE,
+            "Firebase authentication is temporarily unavailable",
+        ) from exc
+
+
+def authenticate_firebase(
+    id_token: str,
+    requested_role: Role | None = None,
+    *,
+    settings: Settings | None = None,
+    verifier: Callable[[str, Settings], Mapping[str, Any]] | None = None,
+) -> AuthUser:
+    """Exchange a verified Firebase identity for a My Ride user."""
+    settings = settings or get_settings()
+    claims = (verifier or _verify_firebase_id_token)(id_token, settings)
+    user_id = str(claims.get("sub") or claims.get("user_id") or "").strip()
+    if not user_id:
+        raise HTTPException(status.HTTP_401_UNAUTHORIZED, "Firebase token has no user ID")
+
+    claimed_role = claims.get("role")
+    if claimed_role is not None and claimed_role not in ("rider", "driver", "admin"):
+        raise HTTPException(status.HTTP_403_FORBIDDEN, "Invalid Firebase role claim")
+
+    role: Role = claimed_role or "rider"
+    if requested_role and requested_role != role:
+        raise HTTPException(
+            status.HTTP_403_FORBIDDEN,
+            f"This account is a {role}, not {requested_role}",
+        )
+
+    email = str(claims.get("email") or "").strip() or None
+    phone = str(claims.get("phone_number") or "").strip() or None
+    name = str(claims.get("name") or "").strip() or email or phone or "My Ride user"
+    return AuthUser(id=user_id, email=email, name=name, role=role, phone=phone)
+
+
 async def get_current_user(
     creds: HTTPAuthorizationCredentials | None = Depends(_bearer),
     settings: Settings = Depends(get_settings),
@@ -188,6 +250,32 @@ async def get_current_user(
     if not creds or not creds.credentials:
         raise HTTPException(status.HTTP_401_UNAUTHORIZED, "Login required")
     return decode_token(creds.credentials, settings)
+
+
+async def get_websocket_user(
+    websocket: WebSocket,
+    *roles: Role,
+    settings: Settings | None = None,
+) -> AuthUser | None:
+    await websocket.accept()
+    try:
+        raw = await asyncio.wait_for(websocket.receive_text(), timeout=5)
+        message = json.loads(raw)
+        token = message.get("token") if message.get("type") == "auth" else None
+    except (asyncio.TimeoutError, json.JSONDecodeError):
+        token = None
+    if not isinstance(token, str) or not token:
+        await websocket.close(code=4401, reason="Login required")
+        return None
+    try:
+        user = decode_token(token, settings or get_settings())
+    except HTTPException:
+        await websocket.close(code=4401, reason="Invalid token")
+        return None
+    if roles and user.role not in roles:
+        await websocket.close(code=4403, reason="Insufficient role")
+        return None
+    return user
 
 
 def require_role(*roles: Role):

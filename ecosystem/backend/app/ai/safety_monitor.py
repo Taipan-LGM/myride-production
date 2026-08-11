@@ -6,6 +6,8 @@ from dataclasses import asdict, dataclass
 from enum import Enum
 from typing import Any
 
+from app.observability import get_observability
+
 
 class SafetyAlertType(str, Enum):
     ROUTE_DEVIATION = "route_deviation"
@@ -69,4 +71,6 @@ class SafetyMonitor:
                 )
             )
 
+        if alerts:
+            get_observability().record_safety(alerts)
         return alerts

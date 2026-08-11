@@ -1,7 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:my_ride/config/app_config.dart';
+import 'package:my_ride/models/app_user.dart';
 import 'package:my_ride/providers/auth_provider.dart';
+import 'package:my_ride/services/api/ecosystem_auth_api.dart';
 import 'package:my_ride/services/auth_service.dart';
 import 'package:my_ride/services/secure_storage_service.dart';
 import 'package:my_ride/theme/mr_text.dart';
@@ -34,7 +37,17 @@ class _OtpVerificationScreenState extends ConsumerState<OtpVerificationScreen> {
     setState(() { _loading = true; _error = null; });
     try {
       await AuthService.instance.verifyOtp(_code);
-      await SecureStorageService.instance.saveRefreshToken('mock-refresh-${DateTime.now().millisecondsSinceEpoch}');
+      if (AppConfig.useMockAuth) {
+        await SecureStorageService.instance.saveRefreshToken('mock-refresh-${DateTime.now().millisecondsSinceEpoch}');
+      } else {
+        final role = ref.read(authProvider).pendingRole ?? UserRole.rider;
+        final idToken = await AuthService.instance.firebaseIdToken();
+        final user = await EcosystemAuthApi().loginWithFirebase(
+          idToken: idToken,
+          role: role.name,
+        );
+        ref.read(authProvider.notifier).setUser(user);
+      }
       if (mounted) context.go('/auth/profile');
     } catch (e) {
       setState(() => _error = e.toString());

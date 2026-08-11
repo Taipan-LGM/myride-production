@@ -1,0 +1,432 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>My Ride SA — AI Ops · Observability</title>
+  <link rel="icon" href="/static/brand/my_ride_logo.png" />
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;600;700&family=Barlow+Condensed:wght@700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="" />
+  <style>
+    :root {
+      --yellow:#FDB813; --ink:#1f2937; --muted:#6b7280; --line:#e5e7eb;
+      --bg:#f7f7f8; --card:#ffffff; --good:#16a34a; --warn:#f59e0b; --bad:#dc2626;
+    }
+    * { box-sizing: border-box; }
+    body { margin:0; font-family:"DM Sans",system-ui,sans-serif; color:var(--ink); background:var(--bg); }
+    header { padding:1.2rem 1.5rem; background:#fff; border-bottom:1px solid var(--line); display:flex; justify-content:space-between; align-items:center; gap:1rem; flex-wrap:wrap; }
+    .logo { height:44px; border-radius:10px; }
+    h1 { margin:0; font-family:"Barlow Condensed",sans-serif; font-size:1.7rem; }
+    .live { color:var(--good); font-weight:700; font-size:.9rem; }
+    .live.off { color:var(--bad); }
+    nav.tabs { display:flex; gap:.4rem; }
+    nav.tabs a { padding:.4rem .8rem; border:1px solid var(--line); border-radius:999px; color:var(--ink); text-decoration:none; font-size:.85rem; }
+
+    main { padding:1.2rem 1.5rem; display:grid; gap:1rem; grid-template-columns:repeat(auto-fit,minmax(160px,1fr)); }
+    .card { background:var(--card); border:1px solid var(--line); border-radius:14px; padding:1rem; }
+    .card.alert { border-color: var(--bad); }
+    .label { color:var(--muted); font-size:.72rem; text-transform:uppercase; letter-spacing:.06em; }
+    .value { font-size:1.7rem; font-weight:700; margin-top:.25rem; }
+    .sub { color:var(--muted); font-size:.75rem; margin-top:.25rem; }
+    .wide { grid-column:1/-1; }
+    .grid2 { display:grid; grid-template-columns:1fr 1fr; gap:1rem; }
+    @media (max-width: 900px) { .grid2 { grid-template-columns:1fr; } }
+
+    .pulse-dot { display:inline-block; width:.55rem; height:.55rem; background:var(--good); border-radius:50%; margin-right:.4rem; animation:p 1.4s infinite; vertical-align:middle; }
+    @keyframes p { 0%,100% { opacity:1; } 50% { opacity:.4; } }
+    .pulse-dot.off { background:var(--bad); animation:none; }
+
+    .bar-row { display:flex; align-items:center; gap:.5rem; margin:.3rem 0; font-size:.85rem; }
+    .bar-row .name { width:7.5rem; color:var(--muted); text-transform:capitalize; }
+    .bar-row .track { flex:1; background:#eef2f7; border-radius:6px; height:10px; overflow:hidden; }
+    .bar-row .fill { background:var(--yellow); height:100%; border-radius:6px; transition:width .35s; }
+    .bar-row .count { width:2.5rem; text-align:right; font-variant-numeric:tabular-nums; color:var(--ink); }
+    .bar-row.high .fill { background:var(--bad); }
+    .bar-row.med .fill { background:var(--warn); }
+
+    .feed { max-height:300px; overflow:auto; font-size:.82rem; background:#0f172a; color:#cbd5e1; padding:.8rem; border-radius:10px; font-family:ui-monospace,monospace; }
+    .feed .row { padding:.25rem 0; border-bottom:1px dashed #1e293b; }
+    .feed .row:last-child { border-bottom:0; }
+    .feed .row .ts { color:#64748b; margin-right:.5rem; }
+    .feed .row .tag { display:inline-block; padding:0 .35rem; border-radius:4px; font-size:.7rem; margin-right:.35rem; }
+    .tag.fraud { background:#7f1d1d; color:#fee2e2; }
+    .tag.safety { background:#9a3412; color:#ffedd5; }
+    .tag.support { background:#1e3a8a; color:#dbeafe; }
+    .tag.trip { background:#14532d; color:#dcfce7; }
+
+    #map { height:380px; border-radius:12px; overflow:hidden; }
+    .pill { display:inline-block; padding:.15rem .5rem; border-radius:999px; font-size:.75rem; border:1px solid var(--line); }
+    .pill.on { background:#dcfce7; color:#166534; border-color:#bbf7d0; }
+    .pill.alert { background:#fee2e2; color:#991b1b; border-color:#fecaca; }
+
+    pre.kv { background:#f3f4f6; padding:.6rem .8rem; border-radius:8px; max-height:240px; overflow:auto; font-size:.78rem; }
+
+    .btn { border:1px solid var(--line); background:var(--yellow); border-radius:999px; padding:.45rem .9rem; font:inherit; font-weight:600; cursor:pointer; }
+    .btn.ghost { background:#fff; color:var(--ink); }
+
+    .actions { display:flex; gap:.5rem; flex-wrap:wrap; margin-bottom:.5rem; }
+    .actions input { padding:.4rem .6rem; border:1px solid var(--line); border-radius:8px; font:inherit; }
+  </style>
+</head>
+<body>
+  <header>
+    <div style="display:flex;align-items:center;gap:.8rem">
+      <img class="logo" src="/static/brand/my_ride_logo.png" alt="My Ride" />
+      <div>
+        <h1>AI Ops · Observability</h1>
+        <div style="color:var(--muted);font-size:.85rem">Live fraud, safety, support &amp; dispatch counters</div>
+      </div>
+    </div>
+    <div style="display:flex;align-items:center;gap:1rem">
+      <span class="live" id="conn"><span class="pulse-dot" id="dot"></span><span id="conn-label">connecting…</span> <span id="ts"></span></span>
+      <nav class="tabs">
+        <a href="/admin">Admin metrics</a>
+        <a href="/">Hub</a>
+        <a href="/docs">API</a>
+      </nav>
+    </div>
+  </header>
+
+  <main>
+    <div class="card" id="card-ai"><div class="label">AI resolution rate</div><div class="value" id="ai_rate">—</div><div class="sub" id="ai_sub">target 95%</div></div>
+    <div class="card"><div class="label">Fraud assessments</div><div class="value" id="fraud_total">—</div><div class="sub" id="fraud_sub">0 flagged · 0 held</div></div>
+    <div class="card"><div class="label">Safety alerts</div><div class="value" id="safety_total">—</div><div class="sub" id="safety_sub">0 high · 0 medium</div></div>
+    <div class="card"><div class="label">Live rides</div><div class="value" id="live_rides">—</div><div class="sub" id="live_sub">0 online drivers</div></div>
+
+    <div class="card wide">
+      <div class="label">Live fleet &amp; trip map</div>
+      <div id="map"></div>
+    </div>
+
+    <div class="grid2">
+      <div class="card">
+        <div class="label">Fraud — recent reasons</div>
+        <div id="fraud_bars" style="margin-top:.5rem"></div>
+      </div>
+      <div class="card">
+        <div class="label">Safety — alerts by type &amp; severity</div>
+        <div id="safety_bars" style="margin-top:.5rem"></div>
+      </div>
+    </div>
+
+    <div class="grid2">
+      <div class="card">
+        <div class="label">Support — categories &amp; actions</div>
+        <div id="support_bars" style="margin-top:.5rem"></div>
+      </div>
+      <div class="card">
+        <div class="label">Trip lifecycle — by channel</div>
+        <div id="channel_bars" style="margin-top:.5rem"></div>
+      </div>
+    </div>
+
+    <div class="card wide">
+      <div class="label">Per-minute volume (last 60 minutes)</div>
+      <canvas id="spark" height="80" style="width:100%;height:80px"></canvas>
+      <div id="spark_legend" style="font-size:.78rem;color:var(--muted);margin-top:.25rem"></div>
+    </div>
+
+    <div class="card wide">
+      <div class="label">Recent event feed</div>
+      <div class="actions">
+        <select id="feed_kind" class="btn ghost">
+          <option value="all">All kinds</option>
+          <option value="fraud">Fraud</option>
+          <option value="safety">Safety</option>
+          <option value="support">Support</option>
+          <option value="trip">Trip</option>
+        </select>
+        <button class="btn ghost" id="btn-refresh">Refresh now</button>
+        <span class="pill" id="badge-resolved">— resolved</span>
+      </div>
+      <div class="feed" id="feed">Loading…</div>
+    </div>
+
+    <div class="card wide">
+      <div class="label">Synthetic evaluator</div>
+      <div class="grid2">
+        <div>
+          <div style="font-size:.85rem;color:var(--muted);margin-bottom:.3rem">Fraud dry-run</div>
+          <div class="actions">
+            <input id="ff-req" placeholder="requests_last_hour" value="10" />
+            <input id="ff-jump" placeholder="gps_jump_km" value="20" />
+            <input id="ff-hours" placeholder="new_account_hours" value="1" />
+          </div>
+          <button class="btn" id="btn-fraud-test">Run fraud test</button>
+          <pre class="kv" id="fraud_out" style="margin-top:.5rem">—</pre>
+        </div>
+        <div>
+          <div style="font-size:.85rem;color:var(--muted);margin-bottom:.3rem">Safety dry-run</div>
+          <div class="actions">
+            <input id="sf-dev" placeholder="route_deviation 0..1" value="0.55" />
+            <input id="sf-speed" placeholder="speed_kmh" value="140" />
+            <input id="sf-stop" placeholder="stop_minutes" value="0" />
+          </div>
+          <button class="btn" id="btn-safety-test">Run safety test</button>
+          <pre class="kv" id="safety_out" style="margin-top:.5rem">—</pre>
+        </div>
+      </div>
+    </div>
+  </main>
+
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
+  <script>
+    const session = (() => {
+      try { return JSON.parse(localStorage.getItem("myride_session_v1") || "{}"); }
+      catch { return {}; }
+    })();
+    const TOKEN = session.token;
+    const ROLE = session.user && session.user.role;
+
+    const $ = (id) => document.getElementById(id);
+    const fmtPct = (v) => `${(v || 0).toFixed(1)}%`;
+    const fmtNum = (v) => Number(v || 0).toLocaleString();
+
+    let map, driverLayer, tripLayer;
+    function initMap() {
+      if (map) return;
+      map = L.map("map").setView([-26.2041, 28.0473], 5);
+      L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+        maxZoom: 19, attribution: "© OpenStreetMap contributors",
+      }).addTo(map);
+      driverLayer = L.layerGroup().addTo(map);
+      tripLayer = L.layerGroup().addTo(map);
+    }
+
+    const driverIcons = {};
+    function driverIcon(status) {
+      if (!driverIcons[status]) {
+        const color = status === "online" ? "#16a34a" : "#9ca3af";
+        driverIcons[status] = L.divIcon({
+          className: "",
+          html: `<div style="background:${color};width:14px;height:14px;border-radius:50%;border:2px solid #fff;box-shadow:0 0 0 1px rgba(0,0,0,.2)"></div>`,
+          iconSize: [18, 18], iconAnchor: [9, 9],
+        });
+      }
+      return driverIcons[status];
+    }
+
+    function renderMap(live) {
+      initMap();
+      driverLayer.clearLayers();
+      tripLayer.clearLayers();
+      const bounds = [];
+      (live.driver_points || []).forEach((d) => {
+        if (d.lat == null || d.lng == null) return;
+        const m = L.marker([d.lat, d.lng], { icon: driverIcon("online") })
+          .bindPopup(`<b>${d.name || d.driver_id}</b><br>${d.vehicle || "standard"}<br><span style="color:#16a34a">online</span>`);
+        driverLayer.addLayer(m);
+        bounds.push([d.lat, d.lng]);
+      });
+      (live.live_trip_points || []).forEach((t) => {
+        const m = L.circleMarker([t.lat, t.lng], {
+          radius: 9, color: "#FDB813", weight: 2, fillColor: "#FDB813", fillOpacity: 0.35,
+        }).bindPopup(`<b>trip ${String(t.trip_id).slice(0, 8)}</b><br>status: ${t.status}<br>fare: R${(t.fare_cents/100).toFixed(2)}`);
+        tripLayer.addLayer(m);
+      });
+      if (bounds.length > 1) {
+        map.fitBounds(bounds, { padding: [40, 40], maxZoom: 12 });
+      } else if (bounds.length === 1) {
+        map.setView(bounds[0], 11);
+      }
+    }
+
+    function renderBars(target, counts, opts = {}) {
+      const el = $(target);
+      el.innerHTML = "";
+      const entries = Object.entries(counts || {});
+      if (!entries.length) { el.innerHTML = '<div class="sub">no events yet</div>'; return; }
+      const max = Math.max(...entries.map(([, v]) => v));
+      entries.sort((a, b) => b[1] - a[1]).forEach(([k, v]) => {
+        const cls = opts.cls && opts.cls(v, max) || "";
+        const pct = max ? Math.round((v / max) * 100) : 0;
+        el.insertAdjacentHTML("beforeend",
+          `<div class="bar-row ${cls}"><div class="name">${k.replace(/_/g, " ")}</div>
+           <div class="track"><div class="fill" style="width:${pct}%"></div></div>
+           <div class="count">${v}</div></div>`);
+      });
+    }
+
+    function renderSparkline(series) {
+      const cv = $("spark");
+      if (!cv) return;
+      const ctx = cv.getContext("2d");
+      const dpr = window.devicePixelRatio || 1;
+      const w = cv.clientWidth, h = cv.clientHeight;
+      cv.width = w * dpr; cv.height = h * dpr;
+      ctx.scale(dpr, dpr); ctx.clearRect(0, 0, w, h);
+      const kinds = Object.keys(series || {});
+      if (!kinds.length) return;
+      const palette = { trip_lifecycle: "#FDB813", fraud_assessed: "#dc2626", support_handled: "#2563eb" };
+      const max = Math.max(1, ...kinds.flatMap(k => (series[k] || []).map(p => p.count)));
+      const padL = 30, padB = 14, padT = 6, padR = 4;
+      const innerW = w - padL - padR, innerH = h - padT - padB;
+      // axis
+      ctx.strokeStyle = "#e5e7eb"; ctx.beginPath();
+      ctx.moveTo(padL, padT); ctx.lineTo(padL, h - padB); ctx.lineTo(w - padR, h - padB); ctx.stroke();
+      ctx.fillStyle = "#6b7280"; ctx.font = "10px ui-monospace,monospace";
+      ctx.fillText(String(max), 2, padT + 6);
+      kinds.forEach((kind) => {
+        const pts = series[kind] || [];
+        ctx.strokeStyle = palette[kind] || "#1f2937";
+        ctx.fillStyle = palette[kind] || "#1f2937";
+        ctx.beginPath();
+        pts.forEach((p, i) => {
+          const x = padL + (i * innerW) / Math.max(1, pts.length - 1);
+          const y = padT + innerH * (1 - p.count / max);
+          if (i === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
+        });
+        ctx.stroke();
+      });
+      $("spark_legend").innerHTML = kinds.map((k) =>
+        `<span style="color:${palette[k] || "#1f2937"}">● ${k.replace(/_/g, " ")}</span>`
+      ).join(" · ");
+    }
+
+    function renderFeed(recent) {
+      const rows = [];
+      ["fraud", "safety", "support", "trip"].forEach((k) => {
+        (recent[k] || []).forEach((ev) => {
+          rows.push({ kind: k, ts: ev.timestamp, body: ev });
+        });
+      });
+      rows.sort((a, b) => (a.ts < b.ts ? 1 : -1));
+      const html = rows.slice(0, 30).map((r) => {
+        const t = new Date(r.ts).toLocaleTimeString();
+        const body = r.body;
+        let text = "";
+        if (r.kind === "fraud") text = `score=${body.score} flagged=${body.flagged} held=${body.held} reasons=${(body.reasons || []).join(",")}`;
+        else if (r.kind === "safety") text = `${body.alert_type} (${body.severity}) — ${body.message}`;
+        else if (r.kind === "support") text = `${body.category} → ${body.action} conf=${body.confidence}`;
+        else if (r.kind === "trip") text = `${body.status} ${body.channel || ""} ${body.fare_cents ? "R" + (body.fare_cents/100).toFixed(2) : ""}`;
+        return `<div class="row"><span class="ts">${t}</span><span class="tag ${r.kind}">${r.kind}</span>${text}</div>`;
+      }).join("");
+      $("feed").innerHTML = html || "no events yet";
+    }
+
+    function setConnected(ok) {
+      const dot = $("dot");
+      const lbl = $("conn-label");
+      dot.classList.toggle("off", !ok);
+      lbl.textContent = ok ? "live" : "offline";
+    }
+
+    function render(data) {
+      if (!data) return;
+      const ai = data.ai_resolution_rate || 0;
+      $("ai_rate").textContent = fmtPct(ai);
+      $("ai_sub").textContent = `target ${data.ai_resolution_target}%${data.ai_resolution_alert ? " · ⚠ below alert threshold" : ""}`;
+      const aiCard = $("card-ai");
+      aiCard.classList.toggle("alert", !!data.ai_resolution_alert);
+
+      $("fraud_total").textContent = fmtNum(data.fraud.total_assessments);
+      $("fraud_sub").textContent = `${data.fraud.flagged} flagged · ${data.fraud.held} held · avg score ${data.fraud.avg_score}`;
+      $("safety_total").textContent = fmtNum(data.safety.total_alerts);
+      const sev = data.safety.by_severity || {};
+      $("safety_sub").textContent = `${sev.high || 0} high · ${sev.medium || 0} medium · ${sev.low || 0} low`;
+      $("live_rides").textContent = fmtNum(data.live ? data.live.live_rides : 0);
+      $("live_sub").textContent = `${data.live ? data.live.online_drivers : 0} online drivers`;
+
+      renderBars("fraud_bars", data.fraud.by_reason || {});
+      renderBars("safety_bars", data.safety.by_type || {});
+      renderBars("support_bars", data.support.by_category || {}, {
+        cls: (v, max) => v === max ? "high" : "",
+      });
+      renderBars("channel_bars", data.trips.by_channel || {});
+      renderSparkline(data.minute_series);
+      renderMap(data.live || {});
+      renderFeed(data.recent || {});
+
+      const totalSup = (data.support.total || 0);
+      const resolved = (data.support.resolved || 0);
+      const badge = $("badge-resolved");
+      badge.textContent = `${resolved}/${totalSup} resolved`;
+      badge.classList.toggle("on", totalSup > 0 && resolved / totalSup >= 0.9);
+
+      $("ts").textContent = "· " + new Date(data.generated_at).toLocaleTimeString();
+    }
+
+    let ws;
+    function connectWs() {
+      if (!TOKEN || ROLE !== "admin") {
+        $("conn-label").textContent = "sign in as admin on the hub";
+        setConnected(false);
+        return;
+      }
+      const proto = location.protocol === "https:" ? "wss" : "ws";
+      ws = new WebSocket(`${proto}://${location.host}/ws/ops`);
+      ws.onopen = () => {
+        ws.send(JSON.stringify({ type: "auth", token: TOKEN }));
+        setConnected(true);
+      };
+      ws.onclose = () => { setConnected(false); setTimeout(connectWs, 3000); };
+      ws.onerror = () => setConnected(false);
+      ws.onmessage = (ev) => {
+        try {
+          const msg = JSON.parse(ev.data);
+          if (msg.type === "ops.snapshot") render(msg);
+        } catch (e) { /* ignore malformed */ }
+      };
+    }
+
+    async function refreshRecent() {
+      if (!TOKEN) return;
+      const kind = $("feed_kind").value;
+      const r = await fetch(`/ops/observability/recent?kind=${kind}&limit=20`, {
+        headers: { Authorization: "Bearer " + TOKEN },
+      });
+      if (!r.ok) return;
+      const data = await r.json();
+      renderFeed(kind === "all" ? data : { [kind]: data[kind] });
+    }
+
+    async function runFraudTest() {
+      const signals = {
+        requests_last_hour: parseFloat($("ff-req").value || "0"),
+        gps_jump_km: parseFloat($("ff-jump").value || "0"),
+        new_account_hours: parseFloat($("ff-hours").value || "999"),
+        fare_cents: 20000,
+        wallet_balance_cents: 0,
+      };
+      const r = await fetch("/ops/observability/fraud/test", {
+        method: "POST", headers: { "Content-Type": "application/json", Authorization: "Bearer " + TOKEN },
+        body: JSON.stringify(signals),
+      });
+      $("fraud_out").textContent = JSON.stringify(await r.json(), null, 2);
+    }
+
+    async function runSafetyTest() {
+      const payload = {
+        trip_id: "synthetic-" + Date.now(),
+        route_deviation: parseFloat($("sf-dev").value || "0"),
+        speed_kmh: parseFloat($("sf-speed").value || "0"),
+        unexpected_stop: parseFloat($("sf-stop").value || "0") > 5,
+        stop_duration_minutes: parseFloat($("sf-stop").value || "0"),
+      };
+      const r = await fetch("/ops/observability/safety/test", {
+        method: "POST", headers: { "Content-Type": "application/json", Authorization: "Bearer " + TOKEN },
+        body: JSON.stringify(payload),
+      });
+      $("safety_out").textContent = JSON.stringify(await r.json(), null, 2);
+    }
+
+    $("btn-refresh").addEventListener("click", refreshRecent);
+    $("feed_kind").addEventListener("change", refreshRecent);
+    $("btn-fraud-test").addEventListener("click", runFraudTest);
+    $("btn-safety-test").addEventListener("click", runSafetyTest);
+
+    if (TOKEN && ROLE === "admin") {
+      connectWs();
+      // Initial REST fetch for guaranteed first paint even if WS is slow
+      fetch("/ops/observability", { headers: { Authorization: "Bearer " + TOKEN } })
+        .then((r) => r.ok ? r.json() : null)
+        .then(render);
+      refreshRecent();
+    } else {
+      $("feed").innerHTML = "Sign in as admin on the hub (/), then reopen this page.";
+      $("conn-label").textContent = "no admin session";
+      setConnected(false);
+    }
+  </script>
+</body>
+</html>

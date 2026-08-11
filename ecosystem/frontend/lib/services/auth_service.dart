@@ -80,6 +80,17 @@ class AuthService extends ChangeNotifier {
     notifyListeners();
   }
 
+  Future<String> firebaseIdToken() async {
+    if (AppConfig.useMockAuth) {
+      throw StateError('Firebase ID tokens are unavailable in mock auth mode');
+    }
+    final currentUser = _auth?.currentUser;
+    if (currentUser == null) throw StateError('Firebase user is not signed in');
+    final token = await currentUser.getIdToken(true);
+    if (token == null || token.isEmpty) throw StateError('Firebase did not issue an ID token');
+    return token;
+  }
+
   Future<void> signOut() async {
     if (!AppConfig.useMockAuth) await _auth?.signOut();
     _user = null;

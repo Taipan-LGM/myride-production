@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:my_ride/config/app_config.dart';
 import 'package:my_ride/core/api/api_config.dart';
 import 'package:my_ride/models/app_user.dart';
 import 'package:my_ride/providers/auth_provider.dart';
@@ -37,8 +38,15 @@ class _ProfileSetupScreenState extends ConsumerState<ProfileSetupScreen> {
   Future<void> _complete() async {
     if (_name.text.trim().isEmpty) return;
     setState(() => _loading = true);
-    final role = ref.read(authProvider).pendingRole ?? UserRole.rider;
-    final id = role == UserRole.driver ? ApiConfig.defaultDriverId : ApiConfig.defaultRiderId;
+    final auth = ref.read(authProvider);
+    final existingUser = auth.user;
+    final role = existingUser?.role ?? auth.pendingRole ?? UserRole.rider;
+    if (existingUser == null && !AppConfig.useMockAuth) {
+      setState(() => _loading = false);
+      throw StateError('Verified login required before profile setup');
+    }
+    final id = existingUser?.id ??
+        (role == UserRole.driver ? ApiConfig.defaultDriverId : ApiConfig.defaultRiderId);
     final user = AppUser(
       id: id,
       role: role,

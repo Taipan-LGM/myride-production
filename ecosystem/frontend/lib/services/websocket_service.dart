@@ -3,6 +3,7 @@ import 'dart:convert';
 
 import 'package:flutter/foundation.dart';
 import 'package:my_ride/core/api/api_config.dart';
+import 'package:my_ride/services/secure_storage_service.dart';
 import 'package:web_socket_channel/web_socket_channel.dart';
 
 enum WebSocketStatus { connecting, connected, disconnected, error }
@@ -24,12 +25,18 @@ class WebSocketService extends ChangeNotifier {
   static const _maxReconnect = 5;
   String? _lastUrl;
 
-  void connect({String? overridePath}) {
+  Future<void> connect({String? overridePath}) async {
     disconnect();
     status = WebSocketStatus.connecting;
     notifyListeners();
 
     final p = overridePath ?? path;
+    final token = await SecureStorageService.instance.loadJwtToken();
+    if (token == null || token.isEmpty) {
+      status = WebSocketStatus.error;
+      notifyListeners();
+      return;
+    }
     final uri = ApiConfig.wsUri(p);
     _lastUrl = uri.toString();
 
@@ -39,6 +46,7 @@ class WebSocketService extends ChangeNotifier {
 
     try {
       _channel = WebSocketChannel.connect(uri);
+      _channel!.sink.add(jsonEncode({'type': 'auth', 'token': token}));
       status = WebSocketStatus.connected;
       _reconnectAttempts = 0;
       _sub = _channel!.stream.listen(_onMessage, onError: _onError, onDone: _onDone);
@@ -46,7 +54,7 @@ class WebSocketService extends ChangeNotifier {
         _channel?.sink.add(jsonEncode({'type': 'ping'}));
       });
       notifyListeners();
-      if (kDebugMode) debugPrint('✅ WebSocket connected: $_lastUrl');
+      if (kDebugMode) debugPrint('✅ WebSocket connected');
     } catch (e) {
       if (kDebugMode) debugPrint('❌ WebSocket connect error: $e');
       status = WebSocketStatus.error;
