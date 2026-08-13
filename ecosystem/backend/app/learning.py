@@ -71,7 +71,7 @@ _COMMUTE_PATTERNS = [
 
 async def predictive_suggestions(user_id: str, db: FirestoreDB | None = None) -> list[dict[str, Any]]:
     hour = datetime.now().hour
-    suggestions = list(_COMMUTE_PATTERNS)
+    suggestions: list[RideSuggestion] = list(_COMMUTE_PATTERNS)
     if 6 <= hour <= 10:
         ordered = sorted(suggestions, key=lambda s: 0 if "commute" in s.title.lower() else 1)
     elif 15 <= hour <= 20:
@@ -83,23 +83,26 @@ async def predictive_suggestions(user_id: str, db: FirestoreDB | None = None) ->
         ordered = suggestions
     result: list[RideSuggestion] = list(ordered)
     if db:
-        trips = await db.list_trips_for_rider(user_id, limit=5)
-        if trips:
-            last = trips[0]
-            pickup = last.pickup.model_dump() if hasattr(last.pickup, "model_dump") else dict(last.pickup)
-            dropoff = last.dropoff.model_dump() if hasattr(last.dropoff, "model_dump") else dict(last.dropoff)
-            result.insert(
-                0,
-                RideSuggestion(
-                    title="Repeat your last trip?",
-                    pickup_label=last.pickup_address or "Last pickup",
-                    dropoff_label=last.dropoff_address or "Last dropoff",
-                    pickup=pickup,
-                    dropoff=dropoff,
-                    reason="Based on your recent My Ride history",
-                    confidence=0.84,
-                ),
-            )
+        try:
+            trips = await db.list_trips_for_rider(user_id, limit=5)
+            if trips:
+                last = trips[0]
+                pickup = last.pickup.model_dump() if hasattr(last.pickup, "model_dump") else dict(last.pickup)
+                dropoff = last.dropoff.model_dump() if hasattr(last.dropoff, "model_dump") else dict(last.dropoff)
+                result.insert(
+                    0,
+                    RideSuggestion(
+                        title="Repeat your last trip?",
+                        pickup_label=last.pickup_address or "Last pickup",
+                        dropoff_label=last.dropoff_address or "Last dropoff",
+                        pickup=pickup,
+                        dropoff=dropoff,
+                        reason="Based on your recent My Ride history",
+                        confidence=0.84,
+                    ),
+                )
+        except Exception:
+            pass
     return [s.to_dict() for s in result[:3]]
 
 

@@ -13,8 +13,9 @@ from fastapi import APIRouter, Depends, HTTPException, WebSocket, WebSocketDisco
 
 from app.ai.dynamic_pricing import DynamicPricingEngine
 from app.ai_dispatcher import get_dispatcher
-from app.auth import AuthUser, assert_self_or_admin, get_current_user, require_role
+from app.auth import AuthUser, assert_self_or_admin, get_current_user, get_websocket_user, require_role
 from app.firestore_db import FirestoreDB, get_db
+from app.learning import predictive_suggestions
 from app.geofire import filter_nearby_drivers, haversine_km
 from app.models import (
     AcceptRideRequest,
@@ -483,8 +484,13 @@ async def ws_nearby_drivers(websocket: WebSocket, db: FirestoreDB = Depends(get_
 
 
 @router.websocket("/ws/driver-requests/{driver_id}")
-async def ws_driver_requests(websocket: WebSocket, driver_id: str):
-    await websocket.accept()
+async def ws_driver_requests(websocket: WebSocket, driver_id: str, db: FirestoreDB = Depends(get_db)):
+    user = await get_websocket_user(websocket, "driver")
+    if user is None:
+        return
+    if user.id != driver_id and user.role != "admin":
+        await websocket.close(code=4403, reason="Not your driver stream")
+        return
     _ws_driver_requests.setdefault(driver_id, set()).add(websocket)
     try:
         await websocket.send_json({"event": "connected", "driver_id": driver_id})
@@ -596,11 +602,11 @@ async def get_suggestions(
     db: FirestoreDB = Depends(get_db),
     user: AuthUser = Depends(get_current_user),
 ):
-    """Get predictive suggestions for the current rider."""
+    """Get predictive suggestions for the current rider (delegated to learning.py)."""
     if user.role != "rider":
         raise HTTPException(403, "Only riders can receive suggestions")
 
-    suggestions = []
+    suggestions = await predictive_suggestions(user.id, db)
     return {"suggestions": suggestions, "generated_at": datetime.now(timezone.utc).isoformat()}
 
 

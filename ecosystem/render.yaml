@@ -1,0 +1,57 @@
+# My Ride Ecosystem — Render Blueprint
+# See docs/RENDER_ECOSYSTEM.md for full deployment guide.
+
+services:
+  - type: web
+    name: my-ride-ecosystem
+    env: docker
+    region: africa
+    plan: starter
+    repository: Taipan-LGM/My-Ride
+    dockerfilePath: ecosystem/backend/Dockerfile
+    envVars:
+      - key: ENVIRONMENT
+        value: production
+      - key: DEBUG
+        value: false
+      - key: LOG_LEVEL
+        value: info
+      - key: PORT
+        value: 8000
+      - key: JWT_SECRET
+        sync: false
+      - key: CORS_ORIGINS
+        sync: false
+      - key: PUBLIC_BASE_URL
+        sync: false
+      - key: DATABASE_URL
+        fromDatabase:
+          name: myride-pg
+          property: connectionString
+      - key: REDIS_URL
+        fromService:
+          name: myride-redis
+          type: redis
+          property: connectionString
+      - key: USE_POSTGRES_PRIMARY
+        value: false
+    healthCheckPath: /health
+    healthCheckTimeout: 15
+    autoDeploy: true
+
+  - type: redis
+    name: myride-redis
+    region: africa
+    plan: starter
+    maxDataSize: 500
+    evictionPolicy: allkeys-lru
+
+  - type: pserv
+    name: myride-pg
+    env: postgres
+    region: africa
+    plan: starter
+    databaseName: myride
+    ipAllowList:
+      - source: 0.0.0.0/0
+        description: "Allow all (Render ecosystem service only)"
