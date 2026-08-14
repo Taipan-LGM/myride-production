@@ -398,6 +398,41 @@ class FirestoreDB:
         )
         return [Trip(**item) for item in records[:limit]]
 
+    async def create_trip_review(
+        self,
+        trip_id: str,
+        reviewer_id: str,
+        reviewer_role: str,
+        rating: int,
+        comment: str | None = None,
+    ) -> dict[str, Any]:
+        """Persist a driver rating to the Firestore 'reviews' subcollection."""
+        if self._use_memory:
+            key = f"reviews:{trip_id}:{uuid.uuid4().hex[:8]}"
+            record = {
+                "trip_id": trip_id,
+                "reviewer_id": reviewer_id,
+                "reviewer_role": reviewer_role,
+                "rating": rating,
+                "comment": comment,
+                "created_at": _now().isoformat(),
+            }
+            _memory.setdefault("reviews", {})[key] = record
+            return record
+        doc = self._trips().document(trip_id).collection("reviews").document(
+            reviewer_id[:8] + uuid.uuid4().hex[:8]
+        )
+        payload = {
+            "trip_id": trip_id,
+            "reviewer_id": reviewer_id,
+            "reviewer_role": reviewer_role,
+            "rating": rating,
+            "comment": comment,
+            "created_at": _now().isoformat(),
+        }
+        await doc.set(payload)
+        return payload
+
     async def claim_reconciliation_attempt(self, trip_id: str) -> Trip | None:
         from app.postgres_db import claim_reconciliation_attempt as pg_claim, is_postgres_primary
 
