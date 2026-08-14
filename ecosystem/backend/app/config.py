@@ -74,7 +74,22 @@ class Settings(BaseSettings):
     # Demo rider/driver/admin logins — disable before public traffic
     allow_demo_accounts: bool = True
     # Admin-only Phase 0 bulk seed (/admin/phase0/*) — keep true on staging
-    allow_phase0_seed: bool = True
+    allow_phase0_seed: bool = False
+
+    @field_validator("jwt_secret")
+    @classmethod
+    def _validate_jwt_secret(cls, v: str) -> str:
+        v = v.strip()
+        if not v or v == "changed-me-in-production":
+            raise ValueError(
+                "JWT_SECRET must be set to a strong secret (≥32 chars). "
+                "Generate one: openssl rand -hex 32"
+            )
+        if len(v) < 32:
+            raise ValueError(
+                f"JWT_SECRET too short ({len(v)} chars) — must be ≥32 characters"
+            )
+        return v
 
     # Optional Postgres (schema: database/init.sql).
     # Default: dual-write mirror. Set USE_POSTGRES_PRIMARY=true to make Postgres

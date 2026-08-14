@@ -55,6 +55,10 @@ async def create_trip_and_offer(
         driver_id = ranked.get("driver_id")
         if not driver_id:
             continue
+        # Cap per-driver fan-out so a fleet-wide "accept" reply storm doesn't OOM the process.
+        if len(_ws_driver_requests) > 200:
+            logger.warning("driver request fan-out capped at 200 sockets — some drivers may miss ride_offer for %s", trip_id)
+            break
         await push_driver_offer(driver_id, {**event, "score": ranked.get("score")})
         sent += 1
 

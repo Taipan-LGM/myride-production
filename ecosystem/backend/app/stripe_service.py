@@ -170,7 +170,8 @@ class StripeService:
                 "destination": driver_stripe_account_id,
                 "dev_mode": True,
             }
-        transfer = self._stripe.Transfer.create(
+        transfer = await asyncio.to_thread(
+            self._stripe.Transfer.create,
             amount=amount_cents,
             currency=self.settings.stripe_currency,
             destination=driver_stripe_account_id,
