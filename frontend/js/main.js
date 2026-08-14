@@ -3644,7 +3644,7 @@ function adminDashboard({ isAdmin = false } = {}) {
             el("div", { class: "modal-title", html: "Settings" }),
             el("button", { class: "popup-close", type: "button", onClick: () => overlay.remove() }, [
               document.createTextNode("×"),
-            ]),
+            ])
           ])
         );
         modal.appendChild(

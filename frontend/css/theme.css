@@ -1,0 +1,126 @@
+/**
+ * My Ride — Design Tokens (theme)
+ *
+ * Single source of truth for colours, radii, shadows, and
+ * typography-scale used across the web app (CSS custom properties
+ * on :root, consumed by components in style.css).
+ *
+ * Keep changes here; do NOT redefine these values inline in component
+ * CSS outside of :root.
+ */
+
+/* ---------------------------------------------------------------------------
+ * Background & surface
+ * --------------------------------------------------------------------------- */
+
+:root {
+  --bg: #0b1220;
+  --panel: rgba(255, 255, 255, 0.06);
+  --text: #e8eefc;
+  --muted: rgba(232, 238, 252, 0.7);
+  --border: rgba(255, 255, 255, 0.12);
+  --shadow: 0 18px 50px rgba(0, 0, 0, 0.35);
+
+  /* ---------------------------------------------------------------------------
+   * Brand palette (primary → accent2)
+   * --------------------------------------------------------------------------- */
+
+  --accent: #6d5efc;
+  --accent2: #26d0ce;
+
+  /* ---------------------------------------------------------------------------
+   * Semantic colours (used by role-based button gradients)
+   * --------------------------------------------------------------------------- */
+
+  --danger: #ff5a7a;
+  --ok: #44d7a8;
+
+  /* ---------------------------------------------------------------------------
+   * Neon ramp — used for role-based button gradients and decorative
+   * accents (badges, slogans, etc.).
+   * --------------------------------------------------------------------------- */
+
+  --neon-yellow-1: #cfff04;
+  --neon-yellow-2: #ffd400;
+
+  --neon-orange-1: #ff5f1f;
+  --neon-orange-2: #ffb000;
+
+  --neon-red-1: #ff3d7a;
+  --neon-red-2: #ff2d2d;
+
+  --neon-green-1: #44d7a8;
+  --neon-green-2: #9dff5b;
+
+  --neon-blue-1: #00d4ff;
+  --neon-blue-2: #0066ff;
+
+  --neon-purple-1: #e879f9;
+  --neon-purple-2: #9333ea;
+
+  /* ---------------------------------------------------------------------------
+   * Spacing & shape
+   * --------------------------------------------------------------------------- */
+
+  --radius: 16px;
+}
+
+/* ---------------------------------------------------------------------------
+ * Typography scale (all viewport sizes)
+ * --------------------------------------------------------------------------- */
+
+:root {
+  --text-xs: 11px;
+  --text-sm: 12px;
+  --text-base: 13px;
+  --text-md: 14px;
+  --text-lg: 15px;
+  --text-xl: 16px;
+  --text-2xl: 20px;
+  --text-3xl: 26px;
+  --text-4xl: 48px;
+}
+
+/* ---------------------------------------------------------------------------
+ * Role-based button gradients (data-role selectors use these)
+ * --------------------------------------------------------------------------- */
+
+:root {
+  --btn-customer-1: var(--neon-yellow-1);
+  --btn-customer-2: var(--neon-yellow-2);
+  --btn-customer-shadow: rgba(207, 255, 4, 0.18);
+
+  --btn-driver-1: var(--neon-orange-1);
+  --btn-driver-2: var(--neon-orange-2);
+  --btn-driver-shadow: rgba(255, 95, 31, 0.18);
+
+  --btn-admin-1: var(--neon-red-1);
+  --btn-admin-2: var(--neon-red-2);
+  --btn-admin-shadow: rgba(255, 61, 122, 0.18);
+
+  --btn-ok-1: var(--neon-green-1);
+  --btn-ok-2: var(--neon-green-2);
+  --btn-ok-shadow: rgba(68, 215, 168, 0.22);
+
+  --btn-purple-1: var(--neon-purple-1);
+  --btn-purple-2: var(--neon-purple-2);
+  --btn-purple-shadow: rgba(147, 51, 234, 0.38);
+}
+
+/* ---------------------------------------------------------------------------
+ * Interactive hover states
+ * --------------------------------------------------------------------------- */
+
+:root {
+  --hover-glow-strength: 0.15;
+  --hover-glow-radius: 14px;
+  --hover-lift: -1px;
+}
+
+/* ---------------------------------------------------------------------------
+ * App-wide tweaks (non-token)
+ * --------------------------------------------------------------------------- */
+
+* {
+  box-sizing: border-box;
+}
