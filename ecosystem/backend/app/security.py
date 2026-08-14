@@ -67,4 +67,8 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
         # polls without a token otherwise starve the whole hub).
         if response.status_code not in (401, 403, 404):
             q.append(now)
-        return response
+            # Periodically purge IPs with no recent activity to bound memory growth.
+            if len(self._hits) > 5000 and int(now) % 60 == 0:
+                cutoff = now - self.window * 2
+                self._hits = {ip: q for ip, q in self._hits.items() if q and q[-1] > cutoff}
+            return response

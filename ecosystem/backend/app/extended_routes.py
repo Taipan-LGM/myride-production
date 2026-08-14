@@ -57,8 +57,8 @@ async def _broadcast(room: set[WebSocket], event: dict[str, Any]) -> None:
     dead: list[WebSocket] = []
     for ws in room:
         try:
-            await ws.send_json(event)
-        except Exception:
+            await asyncio.wait_for(ws.send_json(event), timeout=30)
+        except (asyncio.TimeoutError, Exception):
             dead.append(ws)
     for ws in dead:
         room.discard(ws)
@@ -421,11 +421,23 @@ async def chat_message(
 async def rate_driver(
     body: RateDriverRequest,
     user: AuthUser = Depends(require_role("rider", "admin")),
+    db: FirestoreDB = Depends(get_db),
 ):
     _ = user
     entry = body.model_dump()
     entry["created_at"] = datetime.now(timezone.utc).isoformat()
+    entry["rated_by"] = user.id
     _ratings.append(entry)
+    try:
+        await db.create_trip_review(
+            trip_id=body.trip_id,
+            reviewer_id=user.id,
+            reviewer_role=user.role,
+            rating=body.rating,
+            comment=body.comment,
+        )
+    except Exception:
+        logger.warning("Failed to persist driver rating to DB", exc_info=True)
     return entry
 
 
