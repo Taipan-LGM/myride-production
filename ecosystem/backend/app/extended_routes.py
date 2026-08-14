@@ -150,7 +150,7 @@ async def request_ride(
         "event": "driver_request",
         "data": {
             "trip_id": trip.id,
-            "rider_name": body.rider_id,
+            "rider_name": body.rider_name or body.rider_id,
             "pickup": body.pickup_address,
             "dropoff": body.dropoff_address,
             "fare_cents": body.fare_estimate_cents,

@@ -19,7 +19,7 @@ class Settings(BaseSettings):
     log_level: str = "info"
     api_host: str = "0.0.0.0"
     api_port: int = 8000
-    cors_origins: str = "*"
+    cors_origins: str = "https://myride-production.onrender.com"
 
     # OpenAI
     openai_api_key: str = ""
@@ -70,7 +70,7 @@ class Settings(BaseSettings):
     driver_search_limit: int = 10
 
     # Auth
-    jwt_secret: str = "my-ride-sa-dev-secret-change-me"
+    jwt_secret: str = "changed-me-in-production"
     # Demo rider/driver/admin logins — disable before public traffic
     allow_demo_accounts: bool = True
     # Admin-only Phase 0 bulk seed (/admin/phase0/*) — keep true on staging

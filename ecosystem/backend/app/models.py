@@ -70,8 +70,8 @@ class DriverProfile(BaseModel):
 class Trip(BaseModel):
     model_config = ConfigDict(extra="allow")
 
-    id: str
-    rider_id: str
+    id: str = ""
+    rider_id: str = ""
     driver_id: str | None = None
     status: TripStatus = TripStatus.requested
     pickup: GeoPoint

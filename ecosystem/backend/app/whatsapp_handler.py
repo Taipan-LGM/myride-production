@@ -66,21 +66,25 @@ class WhatsAppHandler:
             drivers = await db.list_online_drivers()
             pickup = ai.suggested_trip.pickup if ai.suggested_trip else GeoPoint(lat=-33.9249, lng=18.4241)
             dropoff = ai.suggested_trip.dropoff if ai.suggested_trip else GeoPoint(lat=-33.9180, lng=18.4232)
-            offer = await dispatcher.process_booking(
-                rider_id=inbound.from_number,
-                pickup=pickup,
-                dropoff=dropoff,
-                drivers=drivers,
-                pickup_address=ai.suggested_trip.pickup_address if ai.suggested_trip else None,
-                dropoff_address=ai.suggested_trip.dropoff_address if ai.suggested_trip else None,
-            )
-            result = await create_trip_and_offer(db, offer)
-            fare = (result.get("fare") or {}).get("total", "?")
-            trip_id = (result.get("trip_id") or "pending")[:8]
-            reply = (
-                f"Ride booked ({trip_id}). Fare ~R{fare}. "
-                "We're matching a driver now."
-            )
+            if ai.suggested_trip:
+                offer = await dispatcher.process_booking(
+                    rider_id=inbound.from_number,
+                    pickup=pickup,
+                    dropoff=dropoff,
+                    drivers=drivers,
+                    pickup_address=ai.suggested_trip.pickup_address if ai.suggested_trip else None,
+                    dropoff_address=ai.suggested_trip.dropoff_address if ai.suggested_trip else None,
+                )
+                result = await create_trip_and_offer(db, offer)
+                fare = (result.get("fare") or {}).get("total", "?")
+                trip_id = (result.get("trip_id") or "pending")[:8]
+                reply = (
+                    f"Ride booked ({trip_id}). Fare ~R{fare}. "
+                    "We're matching a driver now."
+                )
+            else:
+                reply = "Sorry, we couldn't find that location. Try a nearby landmark or suburb."
+            
         elif ai.intent == "trip_status":
             db = await get_db()
             trips = await db.list_trips_for_rider(inbound.from_number, limit=1)
