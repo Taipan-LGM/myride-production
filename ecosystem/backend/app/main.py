@@ -136,7 +136,7 @@ async def lifespan(app: FastAPI):
 app = FastAPI(
     title="My Ride API",
     description="My Ride SA — AI-operated e-hailing (dispatch, pricing, support, payments).",
-    version="0.3.3",
+    version="0.3.4",
     docs_url="/docs",
     redoc_url="/redoc",
     openapi_url="/openapi.json"
