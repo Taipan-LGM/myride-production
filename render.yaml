@@ -84,7 +84,6 @@ services:
         sync: false
       - key: CARTRACK_API_KEY
         sync: false
-
   - type: redis
     name: myride-redis
     plan: starter
