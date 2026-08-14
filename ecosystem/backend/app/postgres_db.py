@@ -473,7 +473,13 @@ async def create_or_get_payment_record(
                 idempotency_key, trip_external_id, amount_cents, kind, status, external_ref, record
             ) VALUES ($1, $2, $3, $4, $5, $6, $7::jsonb)
             ON CONFLICT (idempotency_key) WHERE idempotency_key IS NOT NULL DO UPDATE
-            SET idempotency_key = payment_ledger.idempotency_key
+            SET trip_external_id = EXCLUDED.trip_external_id,
+                amount_cents = EXCLUDED.amount_cents,
+                kind = EXCLUDED.kind,
+                status = EXCLUDED.status,
+                external_ref = EXCLUDED.external_ref,
+                record = EXCLUDED.record,
+                updated_at = NOW()
             RETURNING record
             """,
             idempotency_key,
