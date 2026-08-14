@@ -287,7 +287,7 @@ async def auth_me(user=Depends(get_current_user)):
     return user.to_dict()
 
 
-@router.get("/auth/demo-accounts")
+@extended_router.get("/auth/demo-accounts")
 async def auth_demo_accounts(
     settings: Settings = Depends(settings_dep),
     user: AuthUser | None = Depends(get_current_user),
