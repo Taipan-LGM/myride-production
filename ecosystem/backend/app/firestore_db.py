@@ -419,6 +419,8 @@ class FirestoreDB:
             }
             _memory.setdefault("reviews", {})[key] = record
             return record
+        from google.cloud import firestore
+
         doc = self._trips().document(trip_id).collection("reviews").document(
             reviewer_id[:8] + uuid.uuid4().hex[:8]
         )
