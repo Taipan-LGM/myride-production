@@ -1,3 +1,13 @@
+<<<<<<< HEAD
+__pycache__/
+*.py[cod]
+.env
+.venv/
+venv/
+data/*.db
+.pytest_cache/
+.coverage
+=======
 node_modules/
 
 # Local env (never commit secrets)
@@ -49,3 +59,4 @@ npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
 pnpm-debug.log*
+>>>>>>> origin/master
