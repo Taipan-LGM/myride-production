@@ -8,6 +8,7 @@ function isOfficeRole(role) {
 }
 
 const API_BASE = `${location.origin}/api`;
+const WS_BASE = `${location.origin.replace(/^http/, "ws")}`;
 
 const state = {
   token: localStorage.getItem("myride_token") || "",
@@ -373,7 +374,7 @@ async function runStripeRidePayment(rideId, opts = {}) {
           }
         },
       },
-      [document.createTextNode("Pay now")]
+      [document.createTextNode("Pay now — free (no charges)")]
     ),
   ]);
   modal.querySelector(".modal-b").appendChild(actions);
@@ -530,7 +531,7 @@ function showSimulatedPaymentModal(ride, opts = {}) {
     );
   }
 
-  const msgHtml = `<p><strong>No real card charge</strong> — this ride is marked <strong>paid</strong> for testing only.</p><p>Ride <strong>#${escapeHtml(id)}</strong> · Reference amount: <strong>${escapeHtml(fareLabel)}</strong></p>`;
+  const msgHtml = `<p><strong>No real card charge</strong> — this ride is marked <strong>paid</strong> for testing only.</p><p>Ride <strong>#${escapeHtml(id)}</strong> · Reference amount: <strong>${escapeHtml(fareLabel)}</strong></p><p><span class="pill">Free plan checkout</span> <span class="muted">No charges will be made — Stripe mode is off in Settings.</span></p>`;
 
   const bodyNodes = [
     el("div", { class: "popup-msg", html: msgHtml }),
@@ -744,8 +745,9 @@ async function refreshMe() {
 function connectSocket() {
   if (!state.token || state.socket) return;
 
-  state.socket = io({
+  state.socket = io(WS_BASE, {
     auth: { token: state.token },
+    transports: ["websocket"],
   });
 
   state.socket.on("ride:updated", (payload) => {
