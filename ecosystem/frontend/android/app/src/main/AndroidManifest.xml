@@ -15,7 +15,7 @@
     <uses-permission android:name="android.permission.RECORD_AUDIO"/>
 
     <application
-        android:label="my_ride"
+        android:label="${APP_LABEL}"
         android:name="${applicationName}"
         android:icon="@mipmap/ic_launcher">
 

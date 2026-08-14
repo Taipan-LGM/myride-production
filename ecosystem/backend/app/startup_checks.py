@@ -40,6 +40,10 @@ def validate_settings(settings: Settings) -> list[str]:
             warnings.append("DATABASE_URL unset — Postgres dual-write/primary disabled")
         if settings.use_postgres_primary and not settings.database_url:
             critical.append("USE_POSTGRES_PRIMARY=true requires DATABASE_URL")
+        if not settings.allow_demo_accounts and not settings.firestore_project_id:
+            critical.append(
+                "FIRESTORE_PROJECT_ID is required when demo accounts are disabled in production"
+            )
         pub = (settings.public_base_url or "").strip()
         if not pub.startswith("https://"):
             # Render derives HTTPS from RENDER_EXTERNAL_URL; still warn if missing

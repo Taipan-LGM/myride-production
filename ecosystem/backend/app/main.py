@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 import json
 import logging
 from contextlib import asynccontextmanager
@@ -20,9 +21,11 @@ from app.auth import (
     AuthUser,
     assert_self_or_admin,
     authenticate,
+    authenticate_firebase,
     create_token,
     demo_credentials,
     get_current_user,
+    get_websocket_user,
     require_role,
 )
 from app.channels import channel_directory, simulate_channel_booking
@@ -42,6 +45,7 @@ from app.models import (
     DriverLocationUpdate,
     GeoPoint,
     HealthResponse,
+    FirebaseLoginRequest,
     LoginRequest,
     LoginResponse,
     NearbyDriversRequest,
@@ -59,6 +63,7 @@ from app.models import (
     WebSocketEvent,
 )
 from app.offer_stream import create_trip_and_offer
+from app.observability import get_observability
 from app.reconciliation import ReconciliationNotReady, get_reconciliation
 from app.refunds import RefundInProgress, RefundNotReady, get_refund_service
 from app.redis_cache import RedisCache, get_cache
@@ -113,7 +118,15 @@ async def lifespan(app: FastAPI):
     app.state.settings = settings
     app.state.db = db
     app.state.cache = cache
+    # Launch the live /ws/ops observability stream pump.
+    pump_task = asyncio.create_task(_observability_pump())
+    app.state.observability_pump = pump_task
     yield
+    pump_task.cancel()
+    try:
+        await pump_task
+    except asyncio.CancelledError:
+        pass
     await close_cartrack()
     await cache.close()
     await db.close()
@@ -122,9 +135,11 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(
     title="My Ride API",
-    version=__version__,
     description="My Ride SA — AI-operated e-hailing (dispatch, pricing, support, payments).",
-    lifespan=lifespan,
+    version="0.3.2",
+    docs_url="/docs",
+    redoc_url="/redoc",
+    openapi_url="/openapi.json"
 )
 
 _settings = get_settings()
@@ -259,6 +274,14 @@ async def auth_login(body: LoginRequest):
     return LoginResponse(access_token=token, user=user.to_dict())
 
 
+@app.post("/auth/firebase", response_model=LoginResponse)
+async def auth_firebase(body: FirebaseLoginRequest):
+    role = body.role.value if body.role else None
+    user = authenticate_firebase(body.id_token, requested_role=role)
+    token = create_token(user)
+    return LoginResponse(access_token=token, user=user.to_dict())
+
+
 @app.get("/auth/me")
 async def auth_me(user=Depends(get_current_user)):
     return user.to_dict()
@@ -314,6 +337,7 @@ async def cutover_ready(
         "postgres_connected": postgres_status() in ("dual-write", "primary"),
         "postgres_primary": postgres_status() == "primary",
         "redis_connected": bool(cache.enabled),
+        "firebase_auth_configured": bool(settings.firestore_project_id),
         "demo_accounts_allowed": bool(settings.allow_demo_accounts),
         "debug_off": not settings.debug,
         "environment_production": settings.environment == "production",
@@ -326,6 +350,7 @@ async def cutover_ready(
         "jwt_strong",
         "stripe_configured",
         "stripe_webhook_secret",
+        "firebase_auth_configured",
         "debug_off",
         "environment_production",
     ]
@@ -345,6 +370,133 @@ async def cutover_ready(
             "voice_gather": f"{host}/voice/gather",
         },
     )
+
+
+# --------------------------------------------------------------------------- #
+# Observability surface (Part 10 of the brief):
+#   - /ops/observability            snapshot for the admin dashboard
+#   - /ops/observability/recent     raw event feed (paginated by kind)
+#   - /ops/observability/safety/test  admin-only safety telemetry evaluator
+#   - /ops/observability/fraud/test   admin-only fraud signal evaluator
+#   - /ws/ops                        live WebSocket stream (every 3s)
+# --------------------------------------------------------------------------- #
+
+_observability_ws_clients: set[WebSocket] = set()
+
+
+async def _broadcast_observability(payload: dict[str, Any]) -> None:
+    dead: list[WebSocket] = []
+    for ws in _observability_ws_clients:
+        try:
+            await ws.send_json(payload)
+        except Exception:
+            dead.append(ws)
+    for ws in dead:
+        _observability_ws_clients.discard(ws)
+
+
+async def _observability_pump() -> None:
+    """Background task: snapshot every 3s and push to /ws/ops subscribers."""
+    while True:
+        try:
+            await asyncio.sleep(3.0)
+            db = await get_db()
+            payload = await get_observability().snapshot(db)
+            payload["type"] = "ops.snapshot"
+            await _broadcast_observability(payload)
+        except asyncio.CancelledError:
+            return
+        except Exception as exc:  # pragma: no cover - defensive
+            logger.warning("observability pump error: %s", exc)
+
+
+@app.get("/ops/observability")
+async def ops_observability(
+    db: FirestoreDB = Depends(db_dep),
+    _admin: AuthUser = Depends(require_role("admin")),
+):
+    """Live counters + driver / trip positions for the AI Ops dashboard."""
+    return await get_observability().snapshot(db)
+
+
+@app.get("/ops/observability/recent")
+async def ops_observability_recent(
+    kind: str = "all",
+    limit: int = 25,
+    _admin: AuthUser = Depends(require_role("admin")),
+):
+    """Tail of recent events for any single kind (or 'all')."""
+    if kind == "all":
+        return {
+            kind_: get_observability().recent(kind_, limit)
+            for kind_ in ("fraud", "safety", "support", "trip")
+        }
+    if kind not in {"fraud", "safety", "support", "trip"}:
+        raise HTTPException(400, "kind must be fraud|safety|support|trip")
+    return {kind: get_observability().recent(kind, limit)}
+
+
+@app.post("/ops/observability/safety/test")
+async def ops_safety_test(
+    payload: dict[str, Any],
+    db: FirestoreDB = Depends(db_dep),
+    _admin: AuthUser = Depends(require_role("admin")),
+):
+    """Evaluate a synthetic telemetry payload through the SafetyMonitor."""
+    from app.ai_dispatcher import get_dispatcher
+
+    alerts = await get_dispatcher().monitor_trip_safety(payload or {})
+    return {"alerts": alerts, "count": len(alerts)}
+
+
+@app.post("/ops/observability/fraud/test")
+async def ops_fraud_test(
+    signals: dict[str, Any],
+    _admin: AuthUser = Depends(require_role("admin")),
+):
+    """Evaluate synthetic booking signals through the FraudDetection engine."""
+    from app.ai_dispatcher import get_dispatcher
+
+    # Re-use the fraud path used during a real booking (process_booking
+    # calls fraud.assess internally); for an isolated dry-run we reach
+    # the engine directly via the dispatcher cache.
+    dispatcher = get_dispatcher()
+    verdict = await dispatcher.fraud.assess(signals or {})
+    return verdict.to_dict()
+
+
+@app.websocket("/ws/ops")
+async def ws_ops(websocket: WebSocket):
+    """Live ops snapshot stream. Admin auth via token message, like /ws/trips."""
+    user = await get_websocket_user(websocket, "admin")
+    if user is None:
+        return
+    _observability_ws_clients.add(websocket)
+    try:
+        db = await get_db()
+        initial = await get_observability().snapshot(db)
+        initial["type"] = "ops.snapshot"
+        await websocket.send_json(initial)
+        while True:
+            try:
+                raw = await asyncio.wait_for(websocket.receive_text(), timeout=15)
+                try:
+                    msg = json.loads(raw)
+                except json.JSONDecodeError:
+                    continue
+                if msg.get("type") == "ping":
+                    await websocket.send_json({"type": "pong"})
+                elif msg.get("type") == "snapshot":
+                    db = await get_db()
+                    payload = await get_observability().snapshot(db)
+                    payload["type"] = "ops.snapshot"
+                    await websocket.send_json(payload)
+            except asyncio.TimeoutError:
+                await websocket.send_json({"type": "ping"})
+    except WebSocketDisconnect:
+        pass
+    finally:
+        _observability_ws_clients.discard(websocket)
 
 
 def _ml_health_label() -> str:
@@ -540,6 +692,17 @@ async def admin_dashboard():
     if not _ADMIN_HTML.exists():
         raise HTTPException(404, "Admin dashboard missing")
     return FileResponse(_ADMIN_HTML, media_type="text/html")
+
+
+_OBSERVABILITY_HTML = _STATIC_DIR / "observability.html"
+
+
+@app.get("/admin/observability")
+async def admin_observability_dashboard():
+    """Live ops dashboard (Part 10 of the brief)."""
+    if not _OBSERVABILITY_HTML.exists():
+        raise HTTPException(404, "Observability dashboard missing")
+    return FileResponse(_OBSERVABILITY_HTML, media_type="text/html")
 
 
 @app.get("/admin/metrics")
@@ -983,8 +1146,24 @@ async def sms_webhook(request: Request):
 
 
 @app.websocket("/ws/trips/{trip_id}")
-async def trip_websocket(websocket: WebSocket, trip_id: str):
-    await websocket.accept()
+async def trip_websocket(
+    websocket: WebSocket,
+    trip_id: str,
+    db: FirestoreDB = Depends(db_dep),
+):
+    user = await get_websocket_user(websocket)
+    if user is None:
+        return
+    trip = await db.get_trip(trip_id)
+    if not trip:
+        await websocket.close(code=4404, reason="Trip not found")
+        return
+    if user.role == "rider" and trip.rider_id != user.id:
+        await websocket.close(code=4403, reason="Not your trip")
+        return
+    if user.role == "driver" and trip.driver_id != user.id:
+        await websocket.close(code=4403, reason="Not your trip")
+        return
     _ws_rooms.setdefault(trip_id, set()).add(websocket)
     try:
         await websocket.send_json(

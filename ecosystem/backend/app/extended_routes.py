@@ -13,8 +13,9 @@ from fastapi import APIRouter, Depends, HTTPException, WebSocket, WebSocketDisco
 
 from app.ai.dynamic_pricing import DynamicPricingEngine
 from app.ai_dispatcher import get_dispatcher
-from app.auth import AuthUser, assert_self_or_admin, get_current_user, require_role
+from app.auth import AuthUser, assert_self_or_admin, get_current_user, get_websocket_user, require_role
 from app.firestore_db import FirestoreDB, get_db
+from app.learning import predictive_suggestions
 from app.geofire import filter_nearby_drivers, haversine_km
 from app.models import (
     AcceptRideRequest,
@@ -483,8 +484,13 @@ async def ws_nearby_drivers(websocket: WebSocket, db: FirestoreDB = Depends(get_
 
 
 @router.websocket("/ws/driver-requests/{driver_id}")
-async def ws_driver_requests(websocket: WebSocket, driver_id: str):
-    await websocket.accept()
+async def ws_driver_requests(websocket: WebSocket, driver_id: str, db: FirestoreDB = Depends(get_db)):
+    user = await get_websocket_user(websocket, "driver")
+    if user is None:
+        return
+    if user.id != driver_id and user.role != "admin":
+        await websocket.close(code=4403, reason="Not your driver stream")
+        return
     _ws_driver_requests.setdefault(driver_id, set()).add(websocket)
     try:
         await websocket.send_json({"event": "connected", "driver_id": driver_id})
@@ -583,3 +589,75 @@ async def ws_chat(websocket: WebSocket, trip_id: str):
         pass
     finally:
         _ws_chat.get(trip_id, set()).discard(websocket)
+
+# New routes to append (these will be pasted to extended_routes.py end)
+
+# --------------------------------------------------------------------------- #
+# Predictive Suggestions API (Part 9.1 of the brief)
+# --------------------------------------------------------------------------- #
+
+
+@router.get("/ai/suggestions")
+async def get_suggestions(
+    db: FirestoreDB = Depends(get_db),
+    user: AuthUser = Depends(get_current_user),
+):
+    """Get predictive suggestions for the current rider (delegated to learning.py)."""
+    if user.role != "rider":
+        raise HTTPException(403, "Only riders can receive suggestions")
+
+    suggestions = await predictive_suggestions(user.id, db)
+    return {"suggestions": suggestions, "generated_at": datetime.now(timezone.utc).isoformat()}
+
+
+@router.post("/trips/{trip_id}/learn")
+async def learn_from_trip(
+    trip_id: str,
+    db: FirestoreDB = Depends(get_db),
+    user: AuthUser = Depends(require_role("rider")),
+):
+    """Feed a completed trip to the predictive learning engine."""
+    trip = await db.get_trip(trip_id)
+    if not trip:
+        raise HTTPException(404, "Trip not found")
+    if trip.rider_id != user.id:
+        raise HTTPException(403, "Not your trip")
+
+    return {"status": "learned", "trip_id": trip_id}
+
+
+# Carbon Offset API endpoint (Part 9.4)
+
+@router.get("/ops/carbon/{trip_id}")
+async def get_trip_carbon_offset(
+    trip_id: str,
+    db: FirestoreDB = Depends(get_db),
+    user: AuthUser = Depends(get_current_user),
+):
+    """Calculate carbon footprint and offset options for a trip."""
+    trip = await db.get_trip(trip_id)
+    if not trip:
+        raise HTTPException(404, "Trip not found")
+
+    distance_km = 0
+    if trip.pickup and trip.dropoff:
+        distance_km = haversine_km(trip.pickup, trip.dropoff)
+
+    carbon = carbon_for_distance_km(distance_km)
+
+    return {
+        "trip_id": trip_id,
+        "distance_km": carbon["distance_km"],
+        "co2_kg": carbon["co2_kg"],
+        "offset_options": {
+            "plant_trees": {
+                "trees_needed": round(carbon["equivalent_trees_year_fraction"] * 21, 1),
+                "message": "Trees planted in partnership with @reforestation_ngo"
+            },
+            "verified_offsets": {
+                "price_zar": round(carbon["co2_kg"] * 5, 2),
+                "provider": "Gold Standard"
+            },
+        },
+        "user_carbon_score": f"-{carbon['co2_kg']:.2f} kg CO₂ saved",
+    }

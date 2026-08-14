@@ -11,6 +11,7 @@ import 'package:my_ride/services/api/driver_api_service.dart';
 import 'package:my_ride/services/api/trip_api_service.dart';
 import 'package:my_ride/services/location/location_service.dart';
 import 'package:my_ride/services/payment_service.dart';
+import 'package:my_ride/services/secure_storage_service.dart';
 import 'package:web_socket_channel/web_socket_channel.dart';
 
 /// Central trip + backend state shared across Rider / Driver tabs.
@@ -161,7 +162,13 @@ class TripSessionService extends ChangeNotifier {
   Future<void> _connectWs(String tripId) async {
     await _wsSub?.cancel();
     await _ws?.sink.close();
-    _ws = WebSocketChannel.connect(ApiConfig.wsUri('/ws/trips/$tripId'));
+    final token = await SecureStorageService.instance.loadJwtToken();
+    if (token == null || token.isEmpty) {
+      throw StateError('Login required for trip updates');
+    }
+    final uri = ApiConfig.wsUri('/ws/trips/$tripId');
+    _ws = WebSocketChannel.connect(uri);
+    _ws!.sink.add(jsonEncode({'type': 'auth', 'token': token}));
     _wsSub = _ws!.stream.listen((raw) {
       try {
         final map = jsonDecode(raw as String) as Map<String, dynamic>;

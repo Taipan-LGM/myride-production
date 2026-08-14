@@ -8,6 +8,7 @@ import 'package:my_ride/core/api/api_exception.dart';
 import 'package:my_ride/core/utils/debouncer.dart';
 import 'package:my_ride/data/sample_data.dart';
 import 'package:my_ride/models/api_models.dart';
+import 'package:my_ride/models/app_user.dart';
 import 'package:my_ride/providers/auth_provider.dart';
 import 'package:my_ride/providers/location_provider.dart';
 import 'package:my_ride/models/ride/ride_request.dart';
@@ -233,7 +234,10 @@ class _RideRequestScreenState extends ConsumerState<RideRequestScreen> {
       await _ensureApiReachable();
 
       final user = ref.read(authProvider).user;
-      final riderId = user?.id ?? ApiConfig.defaultRiderId;
+      if (user == null || user.role != UserRole.rider) {
+        throw StateError('Rider login required');
+      }
+      final riderId = user.id;
       final amountCents = (_fare?['total_cents'] as num?)?.toInt() ?? 2450;
 
       final intent = await _api.createPaymentIntent(

@@ -1,7 +1,7 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:my_ride/core/api/api_config.dart';
 import 'package:my_ride/data/sample_data.dart';
 import 'package:my_ride/models/api_models.dart';
+import 'package:my_ride/models/app_user.dart';
 import 'package:my_ride/providers/auth_provider.dart';
 import 'package:my_ride/services/mobile_api_service.dart';
 
@@ -73,9 +73,18 @@ class RideHistoryNotifier extends StateNotifier<RideHistoryState> {
   }
 
   Future<void> _fetchPage({required int offset, required bool append}) async {
-    final riderId = _ref.read(authProvider).user?.id ?? ApiConfig.defaultRiderId;
+    final user = _ref.read(authProvider).user;
+    if (user == null || user.role != UserRole.rider) {
+      state = state.copyWith(
+        isLoading: false,
+        isLoadingMore: false,
+        hasMore: false,
+        error: 'Rider login required',
+      );
+      return;
+    }
     try {
-      final all = await MobileApiService().listTrips(riderId: riderId);
+      final all = await MobileApiService().listTrips(riderId: user.id);
       final filtered = _applyFilter(all, state.filter);
       final page = filtered.skip(offset).take(_pageSize).toList();
       final merged = append ? [...state.trips, ...page] : page;

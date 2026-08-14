@@ -33,9 +33,13 @@ __pycache__/
 venv/
 **/build/
 **/.dart_tool/
+**/.kotlin/
 **/.flutter-plugins
 **/.flutter-plugins-dependencies
 **/data/ml/*.json
+**/android/key.properties
+**/*.jks
+**/*.keystore
 
 # Generated knowledge graphs (rebuild with graphify update)
 graphify-out/

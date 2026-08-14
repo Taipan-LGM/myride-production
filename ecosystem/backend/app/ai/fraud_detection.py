@@ -5,6 +5,8 @@ from __future__ import annotations
 from dataclasses import asdict, dataclass, field
 from typing import Any
 
+from app.observability import get_observability
+
 
 @dataclass
 class FraudVerdict:
@@ -59,9 +61,11 @@ class FraudDetection:
             reasons.append("high_fare_zero_wallet")
 
         score = min(1.0, round(score, 3))
-        return FraudVerdict(
+        verdict = FraudVerdict(
             score=score,
             should_flag=score >= self.FLAG_THRESHOLD,
             should_hold=score >= self.HOLD_THRESHOLD,
             reasons=reasons,
         )
+        get_observability().record_fraud(verdict)
+        return verdict

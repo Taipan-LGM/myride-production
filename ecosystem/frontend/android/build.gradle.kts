@@ -8,6 +8,10 @@ allprojects {
 }
 
 subprojects {
+    configurations.configureEach {
+        exclude(group = "com.google.android.gms", module = "play-services-tapandpay")
+    }
+
     afterEvaluate {
         extensions.findByType(LibraryExtension::class.java)?.apply {
             compileSdk = 36

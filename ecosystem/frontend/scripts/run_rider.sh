@@ -3,7 +3,10 @@
 set -euo pipefail
 cd "$(dirname "$0")/.."
 
+export API_BASE_URL="http://127.0.0.1:8001"
+
 flutter pub get
-flutter run -t lib/main_rider.dart \
+flutter run --flavor rider -t lib/main_rider.dart \
   --dart-define=APP_FLAVOR=rider \
+  --dart-define=API_BASE_URL="http://127.0.0.1:8001" \
   "$@"

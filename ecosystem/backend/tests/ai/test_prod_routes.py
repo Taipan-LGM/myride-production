@@ -39,8 +39,8 @@ def test_book_requires_auth():
         assert ok.json().get("currency") == "ZAR"
 
 
-def test_suggestions_history_insights():
-    with TestClient(app) as client:
+def test_suggestions_history_insights(client_seed: TestClient):
+    with client_seed as client:
         token = _token(client, "rider@myride.co.za", "ride123", "rider")
         headers = {"Authorization": f"Bearer {token}"}
         sug = client.get("/ai/suggestions", headers=headers)

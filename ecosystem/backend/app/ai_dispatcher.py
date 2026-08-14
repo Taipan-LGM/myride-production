@@ -175,6 +175,17 @@ class AiDispatcher:
             channel=channel,
             context=context,
         )
+        try:
+            from app.observability import get_observability
+
+            get_observability().record_support(
+                category=resolution.category,
+                action=resolution.action,
+                confidence=resolution.confidence,
+                escalated=resolution.needs_human,
+            )
+        except Exception as exc:  # pragma: no cover
+            logger.debug("observability record_support skipped: %s", exc)
         return resolution.to_dict()
 
     async def monitor_trip_safety(self, telemetry: dict[str, Any]) -> list[dict[str, Any]]:

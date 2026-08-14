@@ -10,6 +10,7 @@ import 'package:my_ride/theme/brand_assets.dart';
 import 'package:my_ride/theme/mr_tokens.dart';
 import 'package:my_ride/widgets/brand/mr_logo.dart';
 import 'package:my_ride/widgets/common/mr_error_snackbar.dart';
+import 'package:my_ride/widgets/mr_badge.dart';
 
 class RiderLoginScreen extends ConsumerStatefulWidget {
   const RiderLoginScreen({super.key});
@@ -44,7 +45,7 @@ class _RiderLoginScreenState extends ConsumerState<RiderLoginScreen> {
       );
       ref.read(authProvider.notifier).setUser(user);
       if (AppConfig.legacyBackend) {
-        ref.read(socketConnectionProvider);
+        ref.watch(socketConnectionProvider);
       }
       if (mounted) context.go('/rider/home');
     } catch (e) {
@@ -77,6 +78,14 @@ class _RiderLoginScreenState extends ConsumerState<RiderLoginScreen> {
                     fontStyle: FontStyle.italic,
                     color: MrColors.neutral900.withValues(alpha: 0.6),
                   ),
+                ),
+              ),
+              SizedBox(height: 8.h),
+              // Version badge
+              Center(
+                child: VersionBadge(
+                  version: '0.3.1',
+                  padding: EdgeInsets.zero,
                 ),
               ),
               SizedBox(height: 8.h),
@@ -212,8 +221,8 @@ class _RiderLoginScreenState extends ConsumerState<RiderLoginScreen> {
       border: border,
       enabledBorder: border,
       focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12.r), borderSide: const BorderSide(color: MrColors.secondary, width: 2)),
-      errorBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12.r), borderSide: const BorderSide(color: MrColors.accent, width: 2)),
-      contentPadding: EdgeInsets.symmetric(horizontal: 16.w, vertical: 16.h),
+      errorBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12.r), borderSide: BorderSide(color: MrColors.accent, width: 2)),
+      contentPadding: EdgeInsets.symmetric(horizontal: 16.h, vertical: 16.h),
     );
   }
 

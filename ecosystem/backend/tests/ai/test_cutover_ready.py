@@ -16,6 +16,7 @@ def test_cutover_endpoint_shape():
         assert "webhook_urls" in body
         assert body["webhook_urls"]["stripe"].endswith("/webhooks/stripe")
         assert isinstance(body["missing"], list)
+        assert "firebase_auth_configured" in body["checks"]
 
 
 def test_demo_login_blocked_when_disabled(monkeypatch):

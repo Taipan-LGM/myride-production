@@ -50,14 +50,16 @@ Response:
 
 - Keep paid integrations in mock/sandbox mode until the explicit go-live decision.
 - Keep `ALLOW_PHASE0_SEED=false` in production.
-- Disable demo accounts only after a production identity provider can issue FastAPI-compatible JWTs; the current FastAPI login route otherwise has no non-demo login path.
+- Configure the same `FIRESTORE_PROJECT_ID` in FastAPI and Flutter before disabling demos. Flutter exchanges a verified Firebase ID token at `POST /auth/firebase` for the FastAPI JWT used by protected routes.
+- Firebase users without a custom `role` claim are Riders. Set `role=driver` only after driver approval and `role=admin` only through an operator-controlled Firebase Admin process; clients cannot self-elevate.
+- Verify Rider OTP login, one approved Driver login, and one Admin login before setting `ALLOW_DEMO_ACCOUNTS=false`. Production startup rejects demo shutdown when Firebase is not configured.
 - Stripe Connect approval, Twilio sandbox enrollment, Cartrack test access, OpenAI credentials, UptimeRobot ownership, and Render backup settings require their respective account owners.
 
 ## Android release gate
 
 Internal Rider and Driver APKs must be compiled with `API_BASE_URL=https://my-ride-ecosystem.onrender.com` and `LEGACY_BACKEND=false`. Before Play Store publication:
 
-- replace the debug release signing configuration with an operator-owned upload keystore stored outside Git;
-- assign distinct application IDs if Rider and Driver are distributed as separate apps;
+- copy `android/key.properties.example` to ignored `android/key.properties` and supply an operator-owned upload keystore stored outside Git;
+- build the `rider` flavor as `com.myride.rider` and the `driver` flavor as `com.myride.driver` using the release scripts in `frontend/scripts`;
 - supply restricted Google Maps and Firebase Android configuration;
 - clear the existing Flutter analyzer warnings and run device/emulator smoke tests for booking, location permissions, driver offers, and SOS.

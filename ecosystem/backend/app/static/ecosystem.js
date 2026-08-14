@@ -674,6 +674,7 @@
     const proto = location.protocol === "https:" ? "wss" : "ws";
     driverWs = new WebSocket(`${proto}://${location.host}/ws/driver-requests/${driverId}`);
     driverWs.onopen = () => {
+      driverWs.send(JSON.stringify({ type: "auth", token: session.token }));
       $("#driver-out").textContent = `Listening for AI ride offers… (${driverId})`;
     };
     driverWs.onmessage = (ev) => {

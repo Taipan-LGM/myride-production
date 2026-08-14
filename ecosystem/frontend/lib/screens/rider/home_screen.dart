@@ -15,6 +15,7 @@ import 'package:my_ride/widgets/brand/mr_logo.dart';
 import 'package:my_ride/widgets/map/driver_marker.dart';
 import 'package:my_ride/widgets/map/ride_map_widget.dart';
 import 'package:my_ride/widgets/safety/sos_actions.dart';
+import 'package:my_ride/widgets/mr_badge.dart';
 
 /// Rider home tab — map, nearby drivers (REST or WS), quick ride request.
 class HomeScreen extends ConsumerStatefulWidget {
@@ -120,6 +121,11 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
       appBar: AppBar(
         title: const MrLogo.appBar(),
         actions: [
+          // Version badge in AppBar
+          Padding(
+            padding: const EdgeInsets.only(right: 16.0),
+            child: VersionBadge(version: '0.3.1'),
+          ),
           IconButton(
             tooltip: 'SOS',
             icon: const Icon(Icons.sos, color: MrColors.error),
@@ -137,15 +143,19 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
               if (!mounted) return;
               if (pos != null) {
                 _sendNearbyCenter();
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text('Map centered on your current location')),
-                );
+                if (mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text('Map centered on your current location')),
+                  );
+                }
               } else {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(
-                    content: Text('GPS unavailable. Type pickup on Request ride (OpenStreetMap).'),
-                  ),
-                );
+                if (mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                      content: Text('GPS unavailable. Type pickup on Request ride (OpenStreetMap).'),
+                    ),
+                  );
+                }
               }
             },
           ),

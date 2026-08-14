@@ -12,6 +12,12 @@ if (localPropertiesFile.exists()) {
     localPropertiesFile.inputStream().use { localProperties.load(it) }
 }
 
+val keystoreProperties = Properties()
+val keystorePropertiesFile = rootProject.file("key.properties")
+if (keystorePropertiesFile.exists()) {
+    keystorePropertiesFile.inputStream().use { keystoreProperties.load(it) }
+}
+
 // GOOGLE_MAPS_API_KEY: android/local.properties and/or env (see frontend/.env)
 val googleMapsApiKey: String = (
     localProperties.getProperty("GOOGLE_MAPS_API_KEY")
@@ -37,13 +43,37 @@ android {
         versionCode = flutter.versionCode
         versionName = flutter.versionName
         manifestPlaceholders["GOOGLE_MAPS_API_KEY"] = googleMapsApiKey
+        manifestPlaceholders["APP_LABEL"] = "My Ride"
+    }
+
+    flavorDimensions += "app"
+    productFlavors {
+        create("rider") {
+            dimension = "app"
+            applicationId = "com.myride.rider"
+        }
+        create("driver") {
+            dimension = "app"
+            applicationId = "com.myride.driver"
+            manifestPlaceholders["APP_LABEL"] = "My Ride Driver"
+        }
+    }
+
+    signingConfigs {
+        if (keystorePropertiesFile.exists()) {
+            create("release") {
+                keyAlias = keystoreProperties.getProperty("keyAlias")
+                keyPassword = keystoreProperties.getProperty("keyPassword")
+                storeFile = file(keystoreProperties.getProperty("storeFile"))
+                storePassword = keystoreProperties.getProperty("storePassword")
+            }
+        }
     }
 
     buildTypes {
         release {
-            // TODO: Add your own signing config for the release build.
-            // Signing with the debug keys for now, so `flutter run --release` works.
-            signingConfig = signingConfigs.getByName("debug")
+            signingConfig = signingConfigs.findByName("release") ?: signingConfigs.getByName("debug")
+            proguardFiles("proguard-rules.pro")
         }
     }
 }

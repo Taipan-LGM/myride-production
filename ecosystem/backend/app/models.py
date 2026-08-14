@@ -184,6 +184,11 @@ class LoginRequest(BaseModel):
     role: str | None = None  # rider | driver | admin
 
 
+class FirebaseLoginRequest(BaseModel):
+    id_token: str = Field(..., min_length=20)
+    role: UserRole | None = None
+
+
 class LoginResponse(BaseModel):
     access_token: str
     token_type: str = "bearer"
