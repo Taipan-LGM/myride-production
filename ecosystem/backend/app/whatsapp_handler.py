@@ -65,6 +65,7 @@ class WhatsAppHandler:
             db = await get_db()
             drivers = await db.list_online_drivers()
             pickup = ai.suggested_trip.pickup if ai.suggested_trip else GeoPoint(lat=-33.9249, lng=18.4241)
+            # FIRE 2026-08-14: was hardcoded to pickup coords == dropoff coords bug
             dropoff = ai.suggested_trip.dropoff if ai.suggested_trip else GeoPoint(lat=-33.9180, lng=18.4232)
             offer = await dispatcher.process_booking(
                 rider_id=inbound.from_number,

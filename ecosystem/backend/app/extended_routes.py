@@ -108,7 +108,10 @@ async def fare_estimate(body: FareEstimateRequest):
     surge = max(fare.surge_multiplier, body.surge_multiplier)
     total = fare.total
     if body.surge_multiplier > fare.surge_multiplier and fare.surge_multiplier > 0:
-        total = round((fare.total / fare.surge_multiplier) * surge * 2) / 2
+        # client wants to apply a higher surge than engine computed: 
+        # scale the non-surged fare by the client's surge
+        base_for_surging = fare.total / fare.surge_multiplier
+        total = round(base_for_surging * body.surge_multiplier * 2) / 2
         total = max(DynamicPricingEngine.MINIMUM_FARE, total)
     return {
         "distance_km": distance_km,
@@ -136,7 +139,7 @@ async def request_ride(
     assert_self_or_admin(user, body.rider_id, label="rider")
     trip = await db.create_trip(
         {
-            "rider_id": body.rider_id,
+            "rider_name": body.rider_name or body.rider_id,
             "pickup": body.pickup.model_dump(),
             "dropoff": body.dropoff.model_dump(),
             "pickup_address": body.pickup_address,
@@ -150,7 +153,7 @@ async def request_ride(
         "event": "driver_request",
         "data": {
             "trip_id": trip.id,
-            "rider_name": body.rider_id,
+            "rider_name": body.rider_name or body.rider_id,
             "pickup": body.pickup_address,
             "dropoff": body.dropoff_address,
             "fare_cents": body.fare_estimate_cents,
@@ -603,10 +606,12 @@ async def get_suggestions(
     user: AuthUser = Depends(get_current_user),
 ):
     """Get predictive suggestions for the current rider (delegated to learning.py)."""
-    if user.role != "rider":
-        raise HTTPException(403, "Only riders can receive suggestions")
-
-    suggestions = await predictive_suggestions(user.id, db)
+    if user.role == "rider":
+        if user.id != trip.rider_id:
+            raise HTTPException(403, "Only the rider can view suggestions for this trip")
+        suggestions = await predictive_suggestions(user.id, db)
+    elif user.role == "admin":
+        suggestions = await predictive_suggestions(trip.get("rider_id", ""), db)
     return {"suggestions": suggestions, "generated_at": datetime.now(timezone.utc).isoformat()}
 
 
