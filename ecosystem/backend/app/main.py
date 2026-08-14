@@ -287,11 +287,20 @@ async def auth_me(user=Depends(get_current_user)):
     return user.to_dict()
 
 
-@app.get("/auth/demo-accounts")
-async def auth_demo_accounts(settings: Settings = Depends(settings_dep)):
-    """Public demo credentials for SA ecosystem testing (disabled when ALLOW_DEMO_ACCOUNTS=false)."""
+@router.get("/auth/demo-accounts")
+async def auth_demo_accounts(
+    settings: Settings = Depends(settings_dep),
+    user: AuthUser | None = Depends(get_current_user),
+) -> dict[str, list[dict[str, str]]]:
+    """Demo credentials for SA ecosystem testing (disabled when ALLOW_DEMO_ACCOUNTS=false).
+
+    Accessible to any authenticated user in demo mode — not just admins.
+    """
     if not settings.allow_demo_accounts:
         raise HTTPException(403, "Demo accounts disabled")
+    # Require authentication; any logged-in user can view demo credentials.
+    if user is None:
+        raise HTTPException(401, "Login required to view demo credentials")
     return {"accounts": demo_credentials()}
 
 
